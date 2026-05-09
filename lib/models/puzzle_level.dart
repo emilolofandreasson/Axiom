@@ -125,3 +125,121 @@ const kPuzzleLevels = [
     ],
   ),
 ];
+
+// ---------------------------------------------------------------------------
+// French A1 vocabulary path
+// ---------------------------------------------------------------------------
+const kFrenchPuzzleLevels = [
+  PuzzleLevel(
+    id: 'fr-puzzle-01',
+    levelNumber: 1,
+    title: 'Greetings',
+    courseLanguage: 'fr',
+    cefrLevel: 'A1',
+    xpReward: 20,
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Hello',     targetWord: 'Bonjour'),
+      WordPair(id: 'p2', sourceWord: 'Goodbye',   targetWord: 'Au revoir'),
+      WordPair(id: 'p3', sourceWord: 'Please',    targetWord: 'S\'il vous plaît'),
+      WordPair(id: 'p4', sourceWord: 'Thank you', targetWord: 'Merci'),
+      WordPair(id: 'p5', sourceWord: 'Yes',       targetWord: 'Oui'),
+      WordPair(id: 'p6', sourceWord: 'No',        targetWord: 'Non'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'fr-puzzle-02',
+    levelNumber: 2,
+    title: 'Numbers',
+    courseLanguage: 'fr',
+    cefrLevel: 'A1',
+    xpReward: 20,
+    unlocksAfter: 'fr-puzzle-01',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'One',   targetWord: 'Un'),
+      WordPair(id: 'p2', sourceWord: 'Two',   targetWord: 'Deux'),
+      WordPair(id: 'p3', sourceWord: 'Three', targetWord: 'Trois'),
+      WordPair(id: 'p4', sourceWord: 'Four',  targetWord: 'Quatre'),
+      WordPair(id: 'p5', sourceWord: 'Five',  targetWord: 'Cinq'),
+      WordPair(id: 'p6', sourceWord: 'Six',   targetWord: 'Six'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'fr-puzzle-03',
+    levelNumber: 3,
+    title: 'Colors',
+    courseLanguage: 'fr',
+    cefrLevel: 'A1',
+    xpReward: 25,
+    unlocksAfter: 'fr-puzzle-02',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Red',    targetWord: 'Rouge'),
+      WordPair(id: 'p2', sourceWord: 'Blue',   targetWord: 'Bleu'),
+      WordPair(id: 'p3', sourceWord: 'Green',  targetWord: 'Vert'),
+      WordPair(id: 'p4', sourceWord: 'Yellow', targetWord: 'Jaune'),
+      WordPair(id: 'p5', sourceWord: 'Black',  targetWord: 'Noir'),
+      WordPair(id: 'p6', sourceWord: 'White',  targetWord: 'Blanc'),
+    ],
+  ),
+];
+
+// ---------------------------------------------------------------------------
+// German A1 vocabulary path
+// ---------------------------------------------------------------------------
+const kGermanPuzzleLevels = [
+  PuzzleLevel(
+    id: 'de-puzzle-01',
+    levelNumber: 1,
+    title: 'Greetings',
+    courseLanguage: 'de',
+    cefrLevel: 'A1',
+    xpReward: 20,
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Hello',     targetWord: 'Hallo'),
+      WordPair(id: 'p2', sourceWord: 'Goodbye',   targetWord: 'Auf Wiedersehen'),
+      WordPair(id: 'p3', sourceWord: 'Please',    targetWord: 'Bitte'),
+      WordPair(id: 'p4', sourceWord: 'Thank you', targetWord: 'Danke'),
+      WordPair(id: 'p5', sourceWord: 'Yes',       targetWord: 'Ja'),
+      WordPair(id: 'p6', sourceWord: 'No',        targetWord: 'Nein'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'de-puzzle-02',
+    levelNumber: 2,
+    title: 'Numbers',
+    courseLanguage: 'de',
+    cefrLevel: 'A1',
+    xpReward: 20,
+    unlocksAfter: 'de-puzzle-01',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'One',   targetWord: 'Eins'),
+      WordPair(id: 'p2', sourceWord: 'Two',   targetWord: 'Zwei'),
+      WordPair(id: 'p3', sourceWord: 'Three', targetWord: 'Drei'),
+      WordPair(id: 'p4', sourceWord: 'Four',  targetWord: 'Vier'),
+      WordPair(id: 'p5', sourceWord: 'Five',  targetWord: 'Fünf'),
+      WordPair(id: 'p6', sourceWord: 'Six',   targetWord: 'Sechs'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'de-puzzle-03',
+    levelNumber: 3,
+    title: 'Colors',
+    courseLanguage: 'de',
+    cefrLevel: 'A1',
+    xpReward: 25,
+    unlocksAfter: 'de-puzzle-02',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Red',    targetWord: 'Rot'),
+      WordPair(id: 'p2', sourceWord: 'Blue',   targetWord: 'Blau'),
+      WordPair(id: 'p3', sourceWord: 'Green',  targetWord: 'Grün'),
+      WordPair(id: 'p4', sourceWord: 'Yellow', targetWord: 'Gelb'),
+      WordPair(id: 'p5', sourceWord: 'Black',  targetWord: 'Schwarz'),
+      WordPair(id: 'p6', sourceWord: 'White',  targetWord: 'Weiß'),
+    ],
+  ),
+];
+
+const kPuzzleLevelsByLanguage = <String, List<PuzzleLevel>>{
+  'es': kPuzzleLevels,
+  'fr': kFrenchPuzzleLevels,
+  'de': kGermanPuzzleLevels,
+};

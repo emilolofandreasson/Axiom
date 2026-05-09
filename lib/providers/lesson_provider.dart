@@ -26,6 +26,7 @@ class QuestionResult {
 class LessonState {
   const LessonState({
     required this.lesson,
+    this.lessonIndex = 0,
     this.currentIndex = 0,
     this.results = const [],
     this.status = LessonStatus.idle,
@@ -34,6 +35,7 @@ class LessonState {
   });
 
   final Lesson lesson;
+  final int lessonIndex;
   final int currentIndex;
   final List<QuestionResult> results;
   final LessonStatus status;
@@ -52,6 +54,8 @@ class LessonState {
       results.isEmpty ? 0 : correctCount / results.length;
 
   LessonState copyWith({
+    Lesson? lesson,
+    int? lessonIndex,
     int? currentIndex,
     List<QuestionResult>? results,
     LessonStatus? status,
@@ -59,7 +63,8 @@ class LessonState {
     DateTime? questionStartedAt,
   }) =>
       LessonState(
-        lesson:               lesson,
+        lesson:               lesson               ?? this.lesson,
+        lessonIndex:          lessonIndex          ?? this.lessonIndex,
         currentIndex:         currentIndex         ?? this.currentIndex,
         results:              results              ?? this.results,
         status:               status               ?? this.status,
@@ -77,7 +82,8 @@ class LessonNotifier extends Notifier<LessonState> {
 
   @override
   LessonState build() => LessonState(
-        lesson: kSeedLesson,
+        lesson: kLessonsByLanguage['es']![0],
+        lessonIndex: 0,
         status: LessonStatus.idle,
       );
 
@@ -96,6 +102,17 @@ class LessonNotifier extends Notifier<LessonState> {
       'skill_tag':      state.lesson.skillTag,
       'question_count': state.totalQuestions,
     });
+  }
+
+  void nextLesson() {
+    final lessons = kLessonsByLanguage[state.lesson.courseLanguage]!;
+    final nextIndex = (state.lessonIndex + 1) % lessons.length;
+    state = state.copyWith(
+      lesson:      lessons[nextIndex],
+      lessonIndex: nextIndex,
+      status:      LessonStatus.idle,
+    );
+    startLesson();
   }
 
   void submitAnswer(Object answer) {

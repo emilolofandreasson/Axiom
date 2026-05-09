@@ -21,8 +21,8 @@ class Language {
 
 const kLanguages = <Language>[
   Language(code: 'es', name: 'Spanish',          nativeName: 'Español',    flag: '🇪🇸', hasContent: true),
-  Language(code: 'fr', name: 'French',           nativeName: 'Français',   flag: '🇫🇷'),
-  Language(code: 'de', name: 'German',           nativeName: 'Deutsch',    flag: '🇩🇪'),
+  Language(code: 'fr', name: 'French',           nativeName: 'Français',   flag: '🇫🇷', hasContent: true),
+  Language(code: 'de', name: 'German',           nativeName: 'Deutsch',    flag: '🇩🇪', hasContent: true),
   Language(code: 'it', name: 'Italian',          nativeName: 'Italiano',   flag: '🇮🇹'),
   Language(code: 'pt', name: 'Portuguese',       nativeName: 'Português',  flag: '🇧🇷'),
   Language(code: 'ja', name: 'Japanese',         nativeName: '日本語',      flag: '🇯🇵'),

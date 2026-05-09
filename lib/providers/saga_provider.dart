@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flick_sdk/flick_sdk.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/puzzle_level.dart';
 
 class SagaState {
@@ -44,7 +45,32 @@ class SagaState {
 
 class SagaNotifier extends Notifier<SagaState> {
   @override
-  SagaState build() => const SagaState();
+  SagaState build() {
+    _loadFromPrefs();
+    return const SagaState();
+  }
+
+  Future<void> _loadFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final ids = prefs.getStringList('saga_completed_ids') ?? [];
+    final xp = prefs.getInt('saga_total_xp') ?? 0;
+    final streak = prefs.getInt('saga_streak_count') ?? 0;
+    final powerups = prefs.getInt('saga_reveal_powerups') ?? 1;
+    state = SagaState(
+      completedIds:   Set<String>.from(ids),
+      totalXp:        xp,
+      streakCount:    streak,
+      revealPowerups: powerups,
+    );
+  }
+
+  Future<void> _saveToPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('saga_completed_ids', state.completedIds.toList());
+    await prefs.setInt('saga_total_xp', state.totalXp);
+    await prefs.setInt('saga_streak_count', state.streakCount);
+    await prefs.setInt('saga_reveal_powerups', state.revealPowerups);
+  }
 
   void completeLevel(String levelId, int xpReward) {
     final noRetries = (state.retries[levelId] ?? 0) == 0;
@@ -65,6 +91,7 @@ class SagaNotifier extends Notifier<SagaState> {
       'level_id':        levelId,
       'clean_run':       noRetries,
     });
+    _saveToPrefs();
   }
 
   void recordRetry(String levelId) {
@@ -78,12 +105,14 @@ class SagaNotifier extends Notifier<SagaState> {
       'level_id':        levelId,
       'clean_run':       false,
     });
+    _saveToPrefs();
   }
 
   // Returns false if no powerups remain.
   bool useRevealPowerup() {
     if (state.revealPowerups <= 0) return false;
     state = state.copyWith(revealPowerups: state.revealPowerups - 1);
+    _saveToPrefs();
     return true;
   }
 }

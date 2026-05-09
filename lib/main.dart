@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flick_sdk/flick_sdk.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -9,10 +10,12 @@ import 'firebase_options.dart';
 import 'config/env.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/home_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'services/auth_service.dart';
 import 'services/firebase_sync_service.dart';
 
 final authService = AuthService(hmacSalt: Env.hmacSalt);
+bool onboardingDone = false;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +26,9 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('[main] Firebase init failed: $e');
   }
+
+  final prefs = await SharedPreferences.getInstance();
+  onboardingDone = prefs.getBool('onboarding_complete') ?? false;
 
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -73,7 +79,7 @@ class AxiomApp extends StatelessWidget {
       title:                   'Axiom',
       debugShowCheckedModeBanner: false,
       theme:                   buildAppTheme(),
-      home:                    const HomeScreen(),
+      home: onboardingDone ? const HomeScreen() : OnboardingScreen(),
     );
   }
 }

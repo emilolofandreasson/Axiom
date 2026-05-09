@@ -3,9 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flick_sdk/flick_sdk.dart';
 
-// Uncomment after running: flutterfire configure
-// import 'package:firebase_core/firebase_core.dart';
-// import 'firebase_options.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 import 'config/env.dart';
 import 'core/theme/app_theme.dart';
@@ -18,9 +17,8 @@ final authService = AuthService(hmacSalt: Env.hmacSalt);
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Uncomment after running: flutterfire configure
-  // await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  // await authService.initialize();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await authService.initialize();
 
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -45,9 +43,7 @@ Future<void> main() async {
     'platform':    'web',
   });
 
-  // Sync buffered events to Firestore on startup.
-  // Uncomment after Firebase is initialized:
-  // FirebaseSyncService().sync();
+  FirebaseSyncService().sync();
 
   WidgetsBinding.instance.addObserver(_LifecycleObserver());
 

@@ -3,4 +3,8 @@ abstract final class Env {
     'HMAC_SALT',
     defaultValue: 'dev-salt-change-in-prod',
   );
+  static const geminiApiKey = String.fromEnvironment(
+    'GEMINI_API_KEY',
+    defaultValue: '',
+  );
 }

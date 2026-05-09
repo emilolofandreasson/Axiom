@@ -13,9 +13,11 @@ import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'services/auth_service.dart';
 import 'services/firebase_sync_service.dart';
+import 'services/lesson_generator.dart';
 
 final authService = AuthService(hmacSalt: Env.hmacSalt);
 bool onboardingDone = false;
+late final LessonGenerator lessonGenerator;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,6 +28,12 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('[main] Firebase init failed: $e');
   }
+
+  final bridge = Env.geminiApiKey.isNotEmpty
+      ? GeminiBridge(apiKey: Env.geminiApiKey)
+      : StubEdgeAiBridge();
+  await bridge.loadModel('');
+  lessonGenerator = LessonGenerator(bridge: bridge);
 
   final prefs = await SharedPreferences.getInstance();
   onboardingDone = prefs.getBool('onboarding_complete') ?? false;

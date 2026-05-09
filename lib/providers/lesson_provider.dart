@@ -3,6 +3,8 @@ import 'package:flick_sdk/flick_sdk.dart';
 import '../models/lesson.dart';
 import '../models/question.dart';
 import 'language_provider.dart';
+import 'saga_provider.dart';
+import '../main.dart' show lessonGenerator;
 
 // ---------------------------------------------------------------------------
 // Lesson state
@@ -80,6 +82,7 @@ class LessonState {
 
 class LessonNotifier extends Notifier<LessonState> {
   DateTime? _lessonStartedAt;
+  bool _generating = false;
 
   @override
   LessonState build() {
@@ -105,16 +108,47 @@ class LessonNotifier extends Notifier<LessonState> {
     });
   }
 
-  void nextLesson() {
-    final language  = ref.read(languageProvider);
-    final lessons   = kLessonsByLanguage[language.code] ?? kLessonsByLanguage['es']!;
-    final nextIndex = (state.lessonIndex + 1) % lessons.length;
-    state = state.copyWith(
-      lesson:      lessons[nextIndex],
-      lessonIndex: nextIndex,
-      status:      LessonStatus.idle,
+  Future<void> nextLesson() async {
+    final language = ref.read(languageProvider);
+    final saga     = ref.read(sagaProvider);
+
+    final generated = await lessonGenerator.generate(
+      languageCode: language.code,
+      languageName: language.name,
+      userXp:       saga.totalXp,
     );
+
+    if (generated != null) {
+      state = state.copyWith(
+        lesson:      generated,
+        lessonIndex: state.lessonIndex + 1,
+        status:      LessonStatus.idle,
+      );
+    } else {
+      final lessons   = kLessonsByLanguage[language.code] ?? kLessonsByLanguage['es']!;
+      final nextIndex = (state.lessonIndex + 1) % lessons.length;
+      state = state.copyWith(
+        lesson:      lessons[nextIndex],
+        lessonIndex: nextIndex,
+        status:      LessonStatus.idle,
+      );
+    }
     startLesson();
+  }
+
+  Future<void> generateInitialLesson() async {
+    final language = ref.read(languageProvider);
+    final saga     = ref.read(sagaProvider);
+
+    final generated = await lessonGenerator.generate(
+      languageCode: language.code,
+      languageName: language.name,
+      userXp:       saga.totalXp,
+    );
+
+    if (generated != null) {
+      state = state.copyWith(lesson: generated, lessonIndex: 0, status: LessonStatus.idle);
+    }
   }
 
   void submitAnswer(Object answer) {

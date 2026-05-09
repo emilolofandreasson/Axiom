@@ -1,8 +1,11 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../core/theme/app_theme.dart';
 import '../models/language.dart';
+import '../models/lesson.dart';
+import '../models/puzzle_level.dart';
 import '../providers/language_provider.dart';
 import '../providers/lesson_provider.dart';
 import '../providers/saga_provider.dart';
@@ -10,14 +13,35 @@ import 'daily_lesson_screen.dart';
 import 'language_picker_screen.dart';
 import 'saga_map_screen.dart';
 
+String _greeting(String langCode) {
+  final h = DateTime.now().hour;
+  return switch (langCode) {
+    'es' => h < 12 ? 'Buenos días.' : h < 20 ? 'Buenas tardes.' : 'Buenas noches.',
+    'fr' => h < 12 ? 'Bonjour.' : h < 20 ? 'Bon après-midi.' : 'Bonsoir.',
+    'de' => h < 12 ? 'Guten Morgen.' : h < 20 ? 'Guten Tag.' : 'Guten Abend.',
+    _    => h < 12 ? 'Good morning.' : h < 20 ? 'Good afternoon.' : 'Good evening.',
+  };
+}
+
+WordPair? _wordOfDay(String langCode) {
+  final levels = kPuzzleLevelsByLanguage[langCode];
+  if (levels == null || levels.isEmpty) return null;
+  final allPairs = levels.expand((l) => l.pairs).toList();
+  if (allPairs.isEmpty) return null;
+  final index = DateTime.now().day % allPairs.length;
+  return allPairs[index];
+}
+
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final language   = ref.watch(languageProvider);
+    final language    = ref.watch(languageProvider);
     final lessonState = ref.watch(lessonProvider);
-    final sagaState  = ref.watch(sagaProvider);
+    final sagaState   = ref.watch(sagaProvider);
+    final word        = _wordOfDay(language.code);
+    final lessons     = kLessonsByLanguage[language.code] ?? kLessonsByLanguage['es']!;
 
     return Scaffold(
       backgroundColor: FlickColors.background,
@@ -30,13 +54,12 @@ class HomeScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Greeting + language chip
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
                     child: Text(
-                      'Good morning.',
+                      _greeting(language.code),
                       style: Theme.of(context).textTheme.displaySmall,
                     ),
                   ),
@@ -46,7 +69,6 @@ class HomeScreen extends ConsumerWidget {
 
               const SizedBox(height: FlickSpacing.md),
 
-              // Stats row
               Row(
                 children: [
                   _StatPill(icon: '🔥', label: '${sagaState.streakCount} day streak'),
@@ -57,18 +79,24 @@ class HomeScreen extends ConsumerWidget {
 
               const SizedBox(height: FlickSpacing.xl),
 
-              // Daily lesson card
               _DailyLessonCard(
-                language:   language,
+                language:    language,
                 lessonState: lessonState,
+                totalLessons: lessons.length,
               ).animate().fadeIn(delay: 160.ms, duration: 300.ms),
 
               const SizedBox(height: FlickSpacing.md),
 
-              // Puzzle path card
               _PuzzlePathCard()
                   .animate()
                   .fadeIn(delay: 240.ms, duration: 300.ms),
+
+              if (word != null) ...[
+                const SizedBox(height: FlickSpacing.md),
+                _WordOfDayCard(word: word, language: language)
+                    .animate()
+                    .fadeIn(delay: 320.ms, duration: 300.ms),
+              ],
 
               const SizedBox(height: FlickSpacing.lg),
             ],
@@ -163,15 +191,18 @@ class _DailyLessonCard extends StatelessWidget {
   const _DailyLessonCard({
     required this.language,
     required this.lessonState,
+    required this.totalLessons,
   });
 
-  final Language language;
+  final Language    language;
   final LessonState lessonState;
+  final int         totalLessons;
 
   @override
   Widget build(BuildContext context) {
     final hasContent = language.hasContent;
     final lesson     = lessonState.lesson;
+    final lessonNum  = lessonState.lessonIndex + 1;
 
     return GestureDetector(
       onTap: hasContent
@@ -192,23 +223,27 @@ class _DailyLessonCard extends StatelessWidget {
             ? Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'DAILY LESSON',
-                    style: Theme.of(context).textTheme.labelSmall!.copyWith(
-                          color:           FlickColors.textMuted,
-                          letterSpacing:   1.2,
-                        ),
+                  Row(
+                    children: [
+                      Text(
+                        'DAILY LESSON',
+                        style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                              color: FlickColors.textMuted, letterSpacing: 1.2),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '$lessonNum / $totalLessons',
+                        style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                              color: FlickColors.primary, letterSpacing: 0.5),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: FlickSpacing.sm),
-                  Text(
-                    lesson.title,
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
+                  Text(lesson.title,
+                      style: Theme.of(context).textTheme.headlineMedium),
                   const SizedBox(height: FlickSpacing.xs),
-                  Text(
-                    lesson.description,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
+                  Text(lesson.description,
+                      style: Theme.of(context).textTheme.bodyMedium),
                   const SizedBox(height: FlickSpacing.md),
                   Row(
                     children: [
@@ -231,16 +266,13 @@ class _DailyLessonCard extends StatelessWidget {
                   Text(
                     'DAILY LESSON',
                     style: Theme.of(context).textTheme.labelSmall!.copyWith(
-                          color:         FlickColors.textMuted,
-                          letterSpacing: 1.2,
-                        ),
+                          color: FlickColors.textMuted, letterSpacing: 1.2),
                   ),
                   const SizedBox(height: FlickSpacing.sm),
                   Text(
                     'Content coming soon for ${language.name}',
                     style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                          color: FlickColors.textMuted,
-                        ),
+                          color: FlickColors.textMuted),
                   ),
                 ],
               ),
@@ -309,24 +341,71 @@ class _PuzzlePathCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Puzzle Path',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
+                  Text('Puzzle Path',
+                      style: Theme.of(context).textTheme.headlineSmall),
                   const SizedBox(height: FlickSpacing.xs),
-                  Text(
-                    'Match words, build vocab',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
+                  Text('Match words, build vocab',
+                      style: Theme.of(context).textTheme.bodyMedium),
                 ],
               ),
             ),
-            const Icon(
-              Icons.arrow_forward_rounded,
-              color: FlickColors.textMuted,
-            ),
+            const Icon(Icons.arrow_forward_rounded, color: FlickColors.textMuted),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _WordOfDayCard extends StatelessWidget {
+  const _WordOfDayCard({required this.word, required this.language});
+  final WordPair word;
+  final Language language;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(FlickSpacing.lg),
+      decoration: BoxDecoration(
+        color:        FlickColors.primaryDim,
+        borderRadius: const BorderRadius.all(FlickRadius.lg),
+        border:       Border.all(color: FlickColors.primary.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          const Text('✨', style: TextStyle(fontSize: 22)),
+          const SizedBox(width: FlickSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'WORD OF THE DAY',
+                  style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                        color: FlickColors.primary, letterSpacing: 1.2),
+                ),
+                const SizedBox(height: 4),
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: word.targetWord,
+                        style: Theme.of(context).textTheme.labelLarge!.copyWith(
+                              color: FlickColors.primary),
+                      ),
+                      TextSpan(
+                        text: '  —  ${word.sourceWord}',
+                        style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                              color: FlickColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

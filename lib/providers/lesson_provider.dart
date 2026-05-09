@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flick_sdk/flick_sdk.dart';
 import '../models/lesson.dart';
 import '../models/question.dart';
+import 'language_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Lesson state
@@ -81,11 +82,11 @@ class LessonNotifier extends Notifier<LessonState> {
   DateTime? _lessonStartedAt;
 
   @override
-  LessonState build() => LessonState(
-        lesson: kLessonsByLanguage['es']![0],
-        lessonIndex: 0,
-        status: LessonStatus.idle,
-      );
+  LessonState build() {
+    final language = ref.watch(languageProvider);
+    final lessons  = kLessonsByLanguage[language.code] ?? kLessonsByLanguage['es']!;
+    return LessonState(lesson: lessons[0], lessonIndex: 0, status: LessonStatus.idle);
+  }
 
   void startLesson() {
     _lessonStartedAt = DateTime.now();
@@ -105,7 +106,8 @@ class LessonNotifier extends Notifier<LessonState> {
   }
 
   void nextLesson() {
-    final lessons = kLessonsByLanguage[state.lesson.courseLanguage]!;
+    final language  = ref.read(languageProvider);
+    final lessons   = kLessonsByLanguage[language.code] ?? kLessonsByLanguage['es']!;
     final nextIndex = (state.lessonIndex + 1) % lessons.length;
     state = state.copyWith(
       lesson:      lessons[nextIndex],

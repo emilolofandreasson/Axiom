@@ -16,6 +16,7 @@ class SagaMapScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final saga     = ref.watch(sagaProvider);
     final language = ref.watch(languageProvider);
+    final levels   = kPuzzleLevelsByLanguage[language.code] ?? kPuzzleLevels;
 
     return Scaffold(
       backgroundColor: FlickColors.background,
@@ -73,32 +74,32 @@ class SagaMapScreen extends ConsumerWidget {
           if (saga.revealPowerups > 0) const SizedBox(height: FlickSpacing.lg),
 
           // Level nodes with path connectors
-          for (int i = 0; i < kPuzzleLevels.length; i++) ...[
+          for (int i = 0; i < levels.length; i++) ...[
             _LevelNode(
-              level:      kPuzzleLevels[i],
-              isUnlocked: saga.isUnlocked(kPuzzleLevels[i]),
-              isComplete: saga.isCompleted(kPuzzleLevels[i].id),
-              retries:    saga.retriesFor(kPuzzleLevels[i].id),
+              level:      levels[i],
+              isUnlocked: saga.isUnlocked(levels[i]),
+              isComplete: saga.isCompleted(levels[i].id),
+              retries:    saga.retriesFor(levels[i].id),
               index:      i,
-              onTap: saga.isUnlocked(kPuzzleLevels[i])
+              onTap: saga.isUnlocked(levels[i])
                   ? () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) =>
-                              PuzzleScreen(level: kPuzzleLevels[i]),
+                          builder: (_) => PuzzleScreen(level: levels[i]),
                         ),
                       )
                   : null,
             ),
-            if (i < kPuzzleLevels.length - 1)
-              _PathConnector(complete: saga.isCompleted(kPuzzleLevels[i].id)),
+            if (i < levels.length - 1)
+              _PathConnector(complete: saga.isCompleted(levels[i].id)),
           ],
 
           const SizedBox(height: FlickSpacing.xl),
 
           // Grammar lesson gateway — unlocks after 3 puzzle levels
           _LessonGatewayNode(
-            unlocked: saga.completedIds.length >= 3,
+            unlocked:    saga.completedIds.length >= 3,
+            levelsCount: levels.length,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -367,10 +368,12 @@ class _LessonGatewayNode extends StatelessWidget {
   const _LessonGatewayNode({
     required this.unlocked,
     required this.onTap,
+    required this.levelsCount,
   });
 
   final bool unlocked;
   final VoidCallback onTap;
+  final int levelsCount;
 
   @override
   Widget build(BuildContext context) {
@@ -437,7 +440,7 @@ class _LessonGatewayNode extends StatelessWidget {
       ),
     )
         .animate()
-        .fadeIn(delay: Duration(milliseconds: kPuzzleLevels.length * 70 + 100),
+        .fadeIn(delay: Duration(milliseconds: levelsCount * 70 + 100),
                 duration: 350.ms);
   }
 }

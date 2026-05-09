@@ -63,11 +63,14 @@ class ApiKeyService {
       final bridge = GeminiBridge(apiKey: key);
       await bridge.loadModel('');
       final result = await bridge.complete(const InferenceRequest(
-        prompt:    'Say "ok" in JSON: {"status":"ok"}',
-        maxTokens: 20,
+        prompt:    'Reply with the single word: ok',
+        maxTokens: 10,
+        temperature: 0,
       ));
-      return result.isSuccess;
-    } catch (_) {
+      // Accept as long as the API responded — non-empty text means valid key.
+      return result.isSuccess && result.text.isNotEmpty;
+    } catch (e) {
+      debugPrint('[ApiKeyService] verify error: $e');
       return false;
     }
   }

@@ -12,8 +12,14 @@ class AuthService {
   final _auth = FirebaseAuth.instance;
 
   Future<void> initialize() async {
-    final user = _auth.currentUser ?? await _signInAnonymously();
-    _applySubjectId(user);
+    try {
+      final user = _auth.currentUser ?? await _signInAnonymously();
+      _applySubjectId(user);
+    } catch (e) {
+      debugPrint('[AuthService] anonymous sign-in failed: $e');
+      // Fallback — app runs without a Firebase identity.
+      // Enable Anonymous auth in Firebase Console to fix this.
+    }
 
     _auth.authStateChanges().listen((user) {
       if (user != null) _applySubjectId(user);

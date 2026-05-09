@@ -17,8 +17,12 @@ final authService = AuthService(hmacSalt: Env.hmacSalt);
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await authService.initialize();
+  try {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await authService.initialize();
+  } catch (e) {
+    debugPrint('[main] Firebase init failed: $e');
+  }
 
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,

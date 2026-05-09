@@ -11,13 +11,17 @@ import 'config/env.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'services/api_key_service.dart';
 import 'services/auth_service.dart';
 import 'services/firebase_sync_service.dart';
 import 'services/lesson_generator.dart';
 
-final authService = AuthService(hmacSalt: Env.hmacSalt);
+final authService   = AuthService(hmacSalt: Env.hmacSalt);
+final apiKeyService = ApiKeyService();
 bool onboardingDone = false;
-late final LessonGenerator lessonGenerator;
+
+// Non-final — updated by ApiKeyService when user saves/removes their key.
+late LessonGenerator lessonGenerator;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,11 +33,23 @@ Future<void> main() async {
     debugPrint('[main] Firebase init failed: $e');
   }
 
-  final bridge = Env.geminiApiKey.isNotEmpty
-      ? GeminiBridge(apiKey: Env.geminiApiKey)
-      : StubEdgeAiBridge();
-  await bridge.loadModel('');
-  lessonGenerator = LessonGenerator(bridge: bridge);
+  // Start with stub; upgraded to GeminiBridge if a key is found.
+  lessonGenerator = LessonGenerator(bridge: StubEdgeAiBridge());
+
+  // 1. Try saved key from device storage.
+  await apiKeyService.initFromStorage();
+
+  // 2. If signed in (non-anon), try to load key from Firestore (cross-device).
+  if (!authService.isAnonymous) {
+    await apiKeyService.syncFromFirestore();
+  }
+
+  // 3. Fall back to compile-time key (dev convenience).
+  if (Env.geminiApiKey.isNotEmpty) {
+    final bridge = GeminiBridge(apiKey: Env.geminiApiKey);
+    await bridge.loadModel('');
+    lessonGenerator = LessonGenerator(bridge: bridge);
+  }
 
   final prefs = await SharedPreferences.getInstance();
   onboardingDone = prefs.getBool('onboarding_complete') ?? false;
@@ -84,9 +100,9 @@ class AxiomApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title:                   'Axiom',
+      title:                      'Axiom',
       debugShowCheckedModeBanner: false,
-      theme:                   buildAppTheme(),
+      theme:                      buildAppTheme(),
       home: onboardingDone ? const HomeScreen() : OnboardingScreen(),
     );
   }

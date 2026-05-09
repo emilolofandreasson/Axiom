@@ -42,7 +42,7 @@ class _ApiKeyScreenState extends State<ApiKeyScreen> {
     } else {
       setState(() {
         _loading = false;
-        _error   = 'Key verification failed. Make sure you copied the full key.';
+        _error   = 'Invalid key format. Gemini keys start with "AIzaSy" and are 39 characters.';
       });
     }
   }

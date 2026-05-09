@@ -16,8 +16,7 @@ class ApiKeyService {
     final trimmed = key.trim();
     if (trimmed.isEmpty) return false;
 
-    final valid = await _verify(trimmed);
-    if (!valid) return false;
+    if (!_verify(trimmed)) return false;
 
     await _storage.write(key: _kKey, value: trimmed);
     await _syncToFirestore(trimmed);
@@ -58,21 +57,11 @@ class ApiKeyService {
     }
   }
 
-  Future<bool> _verify(String key) async {
-    try {
-      final bridge = GeminiBridge(apiKey: key);
-      await bridge.loadModel('');
-      final result = await bridge.complete(const InferenceRequest(
-        prompt:    'Reply with the single word: ok',
-        maxTokens: 10,
-        temperature: 0,
-      ));
-      // Accept as long as the API responded — non-empty text means valid key.
-      return result.isSuccess && result.text.isNotEmpty;
-    } catch (e) {
-      debugPrint('[ApiKeyService] verify error: $e');
-      return false;
-    }
+  bool _verify(String key) {
+    // Gemini API keys: start with "AIzaSy", 39 chars total.
+    // Full live-verification causes CORS issues on web; the key is
+    // validated for real on the first lesson generation.
+    return key.startsWith('AIzaSy') && key.length >= 35;
   }
 
   Future<void> _syncToFirestore(String key) async {

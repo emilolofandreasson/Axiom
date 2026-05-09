@@ -266,6 +266,90 @@ final kLessonsByLanguage = <String, List<Lesson>>{
       ],
     ),
   ],
+  'fr': [
+    Lesson(
+      id:               'fr-A1-greetings-01',
+      title:            'Greetings',
+      description:      'Learn basic French greetings and introductions.',
+      courseLanguage:   'fr',
+      cefrLevel:        'A1',
+      skillTag:         'vocabulary/greetings',
+      estimatedMinutes: 5,
+      xpReward:         35,
+      questions: const [
+        MultipleChoiceQuestion(
+          id: 'q1', lessonId: 'fr-A1-greetings-01',
+          cefrLevel: 'A1', skillTag: 'vocabulary/greetings',
+          prompt: '"Hello" in French is…',
+          options: ['Bonjour', 'Bonsoir', 'Au revoir', 'Merci'],
+          correctIndex: 0,
+        ),
+        MultipleChoiceQuestion(
+          id: 'q2', lessonId: 'fr-A1-greetings-01',
+          cefrLevel: 'A1', skillTag: 'vocabulary/greetings',
+          prompt: '"Thank you" in French is…',
+          options: ['Merci', 'S\'il vous plaît', 'Bonjour', 'De rien'],
+          correctIndex: 0,
+        ),
+        WordOrderQuestion(
+          id: 'q3', lessonId: 'fr-A1-greetings-01',
+          cefrLevel: 'A1', skillTag: 'grammar/sentence-structure',
+          prompt: 'Arrange into a correct sentence.',
+          shuffledWords: ['m\'appelle', 'Je', 'Marie'],
+          correctOrder:  [1, 0, 2],
+        ),
+        MultipleChoiceQuestion(
+          id: 'q4', lessonId: 'fr-A1-greetings-01',
+          cefrLevel: 'A1', skillTag: 'vocabulary/greetings',
+          prompt: '"Goodbye" in French is…',
+          options: ['Au revoir', 'Bonjour', 'Merci', 'Bonsoir'],
+          correctIndex: 0,
+        ),
+      ],
+    ),
+  ],
+  'de': [
+    Lesson(
+      id:               'de-A1-greetings-01',
+      title:            'Greetings',
+      description:      'Learn basic German greetings and introductions.',
+      courseLanguage:   'de',
+      cefrLevel:        'A1',
+      skillTag:         'vocabulary/greetings',
+      estimatedMinutes: 5,
+      xpReward:         35,
+      questions: const [
+        MultipleChoiceQuestion(
+          id: 'q1', lessonId: 'de-A1-greetings-01',
+          cefrLevel: 'A1', skillTag: 'vocabulary/greetings',
+          prompt: '"Hello" in German is…',
+          options: ['Hallo', 'Auf Wiedersehen', 'Danke', 'Bitte'],
+          correctIndex: 0,
+        ),
+        MultipleChoiceQuestion(
+          id: 'q2', lessonId: 'de-A1-greetings-01',
+          cefrLevel: 'A1', skillTag: 'vocabulary/greetings',
+          prompt: '"Thank you" in German is…',
+          options: ['Danke', 'Bitte', 'Hallo', 'Tschüs'],
+          correctIndex: 0,
+        ),
+        WordOrderQuestion(
+          id: 'q3', lessonId: 'de-A1-greetings-01',
+          cefrLevel: 'A1', skillTag: 'grammar/sentence-structure',
+          prompt: 'Arrange into a correct sentence.',
+          shuffledWords: ['heiße', 'Ich', 'Marie'],
+          correctOrder:  [1, 0, 2],
+        ),
+        MultipleChoiceQuestion(
+          id: 'q4', lessonId: 'de-A1-greetings-01',
+          cefrLevel: 'A1', skillTag: 'vocabulary/greetings',
+          prompt: '"Goodbye" in German is…',
+          options: ['Auf Wiedersehen', 'Hallo', 'Danke', 'Guten Morgen'],
+          correctIndex: 0,
+        ),
+      ],
+    ),
+  ],
 };
 
 Lesson get kSeedLesson => kLessonsByLanguage['es']!.first;

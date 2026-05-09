@@ -12,6 +12,7 @@ import '../providers/saga_provider.dart';
 import 'daily_lesson_screen.dart';
 import 'language_picker_screen.dart';
 import 'saga_map_screen.dart';
+import 'profile_screen.dart';
 
 String _greeting(String langCode) {
   final h = DateTime.now().hour;
@@ -64,6 +65,24 @@ class HomeScreen extends ConsumerWidget {
                     ),
                   ),
                   _LanguageChip(language: language),
+                  const SizedBox(width: FlickSpacing.sm),
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const ProfileScreen()),
+                    ),
+                    child: Container(
+                      width: 38, height: 38,
+                      decoration: BoxDecoration(
+                        color:        FlickColors.surface,
+                        shape:        BoxShape.circle,
+                        border:       Border.all(color: FlickColors.border),
+                      ),
+                      child: const Icon(Icons.person_rounded,
+                          size: 20, color: FlickColors.textSecondary),
+                    ),
+                  ),
                 ],
               ).animate().fadeIn(duration: 300.ms),
 

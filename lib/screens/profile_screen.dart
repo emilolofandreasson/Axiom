@@ -1,0 +1,366 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import '../core/theme/app_theme.dart';
+import '../models/language.dart';
+import '../models/puzzle_level.dart';
+import '../providers/language_provider.dart';
+import '../providers/saga_provider.dart';
+import '../main.dart' show authService;
+import '../services/auth_service.dart';
+import 'auth_screen.dart';
+
+class ProfileScreen extends ConsumerWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final saga     = ref.watch(sagaProvider);
+    final language = ref.watch(languageProvider);
+
+    final completedCount = saga.completedIds.length;
+    final totalLevels    = kPuzzleLevelsByLanguage.values
+        .expand((l) => l)
+        .length;
+    final xpMilestone    = ((saga.totalXp / 500).floor() + 1) * 500;
+    final xpProgress     = (saga.totalXp % 500) / 500;
+
+    return Scaffold(
+      backgroundColor: FlickColors.background,
+      appBar: AppBar(title: const Text('Profile')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(FlickSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+
+            // Identity card
+            _SectionCard(
+              child: Row(
+                children: [
+                  Container(
+                    width: 52, height: 52,
+                    decoration: BoxDecoration(
+                      color:  FlickColors.primaryDim,
+                      shape:  BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.person_rounded,
+                        color: FlickColors.primary, size: 28),
+                  ),
+                  const SizedBox(width: FlickSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          authService.isAnonymous
+                              ? 'Guest learner'
+                              : (authService.currentUser?.email ?? 'Learner'),
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          authService.isAnonymous
+                              ? 'Sign in to save progress across devices'
+                              : 'Signed in',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (authService.isAnonymous)
+                    TextButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AuthScreen(authService: authService),
+                        ),
+                      ),
+                      child: const Text('Sign in'),
+                    ),
+                ],
+              ),
+            ).animate().fadeIn(duration: 300.ms),
+
+            const SizedBox(height: FlickSpacing.lg),
+
+            Text('Progress',
+                style: Theme.of(context).textTheme.headlineSmall)
+                .animate().fadeIn(delay: 80.ms),
+
+            const SizedBox(height: FlickSpacing.md),
+
+            // XP progress
+            _SectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text('⚡', style: TextStyle(fontSize: 18)),
+                      const SizedBox(width: FlickSpacing.sm),
+                      Text('${saga.totalXp} XP',
+                          style: Theme.of(context).textTheme.labelLarge),
+                      const Spacer(),
+                      Text('Next: $xpMilestone XP',
+                          style: Theme.of(context).textTheme.bodyMedium),
+                    ],
+                  ),
+                  const SizedBox(height: FlickSpacing.sm),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: xpProgress),
+                    duration: 800.ms,
+                    curve: Curves.easeOut,
+                    builder: (_, value, __) => LinearProgressIndicator(
+                      value:           value,
+                      backgroundColor: FlickColors.surfaceDim,
+                      valueColor:
+                          const AlwaysStoppedAnimation(FlickColors.primary),
+                      borderRadius:
+                          const BorderRadius.all(FlickRadius.full),
+                      minHeight: 8,
+                    ),
+                  ),
+                ],
+              ),
+            ).animate().fadeIn(delay: 120.ms),
+
+            const SizedBox(height: FlickSpacing.md),
+
+            // Stats row
+            Row(
+              children: [
+                Expanded(
+                  child: _StatCard(
+                    icon:  '🔥',
+                    value: '${saga.streakCount}',
+                    label: 'Day streak',
+                  ),
+                ),
+                const SizedBox(width: FlickSpacing.md),
+                Expanded(
+                  child: _StatCard(
+                    icon:  '🧩',
+                    value: '$completedCount',
+                    label: 'Levels done',
+                  ),
+                ),
+                const SizedBox(width: FlickSpacing.md),
+                Expanded(
+                  child: _StatCard(
+                    icon:  '👁',
+                    value: '${saga.revealPowerups}',
+                    label: 'Powerups',
+                  ),
+                ),
+              ],
+            ).animate().fadeIn(delay: 160.ms),
+
+            const SizedBox(height: FlickSpacing.lg),
+
+            Text('Languages',
+                style: Theme.of(context).textTheme.headlineSmall)
+                .animate().fadeIn(delay: 200.ms),
+
+            const SizedBox(height: FlickSpacing.md),
+
+            ...kLanguages
+                .where((l) => l.hasContent)
+                .toList()
+                .asMap()
+                .entries
+                .map((e) {
+              final lang   = e.value;
+              final levels = kPuzzleLevelsByLanguage[lang.code] ?? [];
+              final done   = levels
+                  .where((l) => saga.isCompleted(l.id))
+                  .length;
+              final isActive = language.code == lang.code;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: FlickSpacing.sm),
+                child: _LanguageProgressCard(
+                  language:    lang,
+                  done:        done,
+                  total:       levels.length,
+                  isActive:    isActive,
+                ).animate().fadeIn(delay: Duration(milliseconds: 220 + e.key * 60)),
+              );
+            }),
+
+            const SizedBox(height: FlickSpacing.lg),
+
+            // Data pipeline note
+            _SectionCard(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.insights_rounded,
+                      color: FlickColors.primary, size: 20),
+                  const SizedBox(width: FlickSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Detailed analytics coming',
+                            style: Theme.of(context).textTheme.labelLarge),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Your learning data is being collected and will power '
+                          'personalised insights — accuracy by skill, '
+                          'time-per-question, and retention trends.',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ).animate().fadeIn(delay: 400.ms),
+
+            const SizedBox(height: FlickSpacing.xl),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(FlickSpacing.lg),
+        decoration: BoxDecoration(
+          color:        FlickColors.surface,
+          borderRadius: const BorderRadius.all(FlickRadius.lg),
+          border:       Border.all(color: FlickColors.border),
+        ),
+        child: child,
+      );
+}
+
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+  final String icon;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(
+          vertical: FlickSpacing.md,
+          horizontal: FlickSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color:        FlickColors.surface,
+          borderRadius: const BorderRadius.all(FlickRadius.lg),
+          border:       Border.all(color: FlickColors.border),
+        ),
+        child: Column(
+          children: [
+            Text(icon, style: const TextStyle(fontSize: 20)),
+            const SizedBox(height: 4),
+            Text(value,
+                style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                      color: FlickColors.primary,
+                      fontWeight: FontWeight.w700,
+                    )),
+            Text(label,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium!
+                    .copyWith(color: FlickColors.textMuted)),
+          ],
+        ),
+      );
+}
+
+class _LanguageProgressCard extends StatelessWidget {
+  const _LanguageProgressCard({
+    required this.language,
+    required this.done,
+    required this.total,
+    required this.isActive,
+  });
+
+  final Language language;
+  final int      done;
+  final int      total;
+  final bool     isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = total == 0 ? 0.0 : done / total;
+
+    return Container(
+      padding: const EdgeInsets.all(FlickSpacing.md),
+      decoration: BoxDecoration(
+        color:        FlickColors.surface,
+        borderRadius: const BorderRadius.all(FlickRadius.lg),
+        border: Border.all(
+          color: isActive ? FlickColors.primary : FlickColors.border,
+          width: isActive ? 2 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Text(language.flag, style: const TextStyle(fontSize: 24)),
+          const SizedBox(width: FlickSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(language.name,
+                        style: Theme.of(context).textTheme.labelLarge),
+                    if (isActive) ...[
+                      const SizedBox(width: FlickSpacing.xs),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: FlickColors.primaryDim,
+                          borderRadius:
+                              const BorderRadius.all(FlickRadius.full),
+                        ),
+                        child: Text('Active',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall!
+                                .copyWith(color: FlickColors.primary)),
+                      ),
+                    ],
+                    const Spacer(),
+                    Text('$done / $total levels',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium!
+                            .copyWith(color: FlickColors.textMuted)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                LinearProgressIndicator(
+                  value:           progress,
+                  backgroundColor: FlickColors.surfaceDim,
+                  valueColor: AlwaysStoppedAnimation(
+                      isActive ? FlickColors.primary : FlickColors.success),
+                  borderRadius: const BorderRadius.all(FlickRadius.full),
+                  minHeight: 5,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

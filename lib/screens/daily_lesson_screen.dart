@@ -25,6 +25,9 @@ class DailyLessonScreen extends ConsumerWidget {
         totalCount:    state.totalQuestions,
         xpEarned:      state.lesson.xpReward,
         onContinue:    () => notifier.startLesson(),
+        wrongAnswers:  state.results
+            .where((r) => r.answerState == AnswerState.wrong)
+            .toList(),
       );
     }
 

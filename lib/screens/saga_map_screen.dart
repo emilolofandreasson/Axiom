@@ -2,49 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_theme.dart';
+import '../models/language.dart';
 import '../models/puzzle_level.dart';
+import '../providers/language_provider.dart';
 import '../providers/saga_provider.dart';
 import 'puzzle_screen.dart';
 import 'daily_lesson_screen.dart';
 
-// Cultural accent colors and flags keyed by ISO 639-1 language code
-extension _LanguageTheme on String {
-  Color get accentColor => switch (this) {
-    'es' => const Color(0xFFC0392B), // Spanish red
-    'fr' => const Color(0xFF1A5276), // French navy
-    'de' => const Color(0xFF1E8449), // German green
-    'pt' => const Color(0xFF1A5276), // Portuguese blue
-    'it' => const Color(0xFF27AE60), // Italian green
-    _    => FlickColors.primary,
-  };
-
-  String get flag => switch (this) {
-    'es' => '🇪🇸',
-    'fr' => '🇫🇷',
-    'de' => '🇩🇪',
-    'pt' => '🇵🇹',
-    'it' => '🇮🇹',
-    _    => '🌍',
-  };
-
-  String get fullName => switch (this) {
-    'es' => 'Spanish',
-    'fr' => 'French',
-    'de' => 'German',
-    'pt' => 'Portuguese',
-    'it' => 'Italian',
-    _    => 'Unknown',
-  };
-}
-
 class SagaMapScreen extends ConsumerWidget {
   const SagaMapScreen({super.key});
 
-  static const _language = 'es';
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final saga = ref.watch(sagaProvider);
+    final saga     = ref.watch(sagaProvider);
+    final language = ref.watch(languageProvider);
 
     return Scaffold(
       backgroundColor: FlickColors.background,
@@ -91,7 +62,7 @@ class SagaMapScreen extends ConsumerWidget {
         ),
         children: [
           // Language header
-          _LanguageHeader(language: _language),
+          _LanguageHeader(language: language),
 
           const SizedBox(height: FlickSpacing.xl),
 
@@ -148,7 +119,7 @@ class SagaMapScreen extends ConsumerWidget {
 
 class _LanguageHeader extends StatelessWidget {
   const _LanguageHeader({required this.language});
-  final String language;
+  final Language language;
 
   @override
   Widget build(BuildContext context) {
@@ -159,7 +130,7 @@ class _LanguageHeader extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(language.fullName,
+            Text(language.name,
                 style: Theme.of(context).textTheme.headlineSmall),
             Text(
               'Beginner path · A1–A2',

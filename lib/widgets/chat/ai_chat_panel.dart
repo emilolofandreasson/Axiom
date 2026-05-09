@@ -34,10 +34,12 @@ class _AIChatPanelState extends State<AIChatPanel> {
   bool _isTyping   = false;
   bool _canFinish  = false;
 
+  void _onControllerChanged() => setState(() {});
+
   @override
   void initState() {
     super.initState();
-    // Seed the conversation with the tutor's opening prompt.
+    _controller.addListener(_onControllerChanged);
     _addMessage(ChatMessage(
       id:        '0',
       role:      ChatRole.assistant,
@@ -48,6 +50,7 @@ class _AIChatPanelState extends State<AIChatPanel> {
 
   @override
   void dispose() {
+    _controller.removeListener(_onControllerChanged);
     _controller.dispose();
     _scrollCtrl.dispose();
     _focusNode.dispose();
@@ -178,7 +181,7 @@ class _AIChatPanelState extends State<AIChatPanel> {
                 textInputAction: TextInputAction.send,
                 onSubmitted:  (_) => _send(),
                 decoration: InputDecoration(
-                  hintText:    'Write in Spanish…',
+                  hintText:    'Write your answer…',
                   suffixIcon:  _controller.text.isNotEmpty
                       ? null
                       : const Icon(Icons.mic_none_rounded,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../core/theme/app_theme.dart';
+import '../models/question.dart';
+import '../providers/lesson_provider.dart';
 
 class LessonCompleteScreen extends StatelessWidget {
   const LessonCompleteScreen({
@@ -9,12 +11,14 @@ class LessonCompleteScreen extends StatelessWidget {
     required this.totalCount,
     required this.xpEarned,
     required this.onContinue,
+    this.wrongAnswers = const [],
   });
 
   final int correctCount;
   final int totalCount;
   final int xpEarned;
   final VoidCallback onContinue;
+  final List<QuestionResult> wrongAnswers;
 
   double get _accuracy => correctCount / totalCount;
 
@@ -28,6 +32,49 @@ class LessonCompleteScreen extends StatelessWidget {
     if (_accuracy >= 0.9) return 'You\'re building real fluency.';
     if (_accuracy >= 0.7) return 'Every lesson sharpens your edge.';
     return 'Mistakes are how languages are learned.';
+  }
+
+  void _showReview(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: FlickColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: FlickRadius.xl),
+      ),
+      isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        maxChildSize: 0.9,
+        builder: (_, controller) => ListView(
+          controller: controller,
+          padding: const EdgeInsets.all(FlickSpacing.lg),
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: FlickSpacing.lg),
+                decoration: BoxDecoration(
+                  color: FlickColors.border,
+                  borderRadius: const BorderRadius.all(FlickRadius.full),
+                ),
+              ),
+            ),
+            Text(
+              'Review mistakes',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: FlickColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: FlickSpacing.md),
+            ...wrongAnswers.map((r) => _ReviewCard(result: r)),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -106,21 +153,76 @@ class LessonCompleteScreen extends StatelessWidget {
 
               const SizedBox(height: FlickSpacing.md),
 
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: () {},
-                  child: const Text(
-                    'Review mistakes',
-                    style: TextStyle(color: FlickColors.textSecondary),
+              if (wrongAnswers.isNotEmpty)
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => _showReview(context),
+                    child: const Text(
+                      'Review mistakes',
+                      style: TextStyle(color: FlickColors.textSecondary),
+                    ),
                   ),
-                ),
-              ).animate().fadeIn(delay: 500.ms),
+                ).animate().fadeIn(delay: 500.ms),
 
               const SizedBox(height: FlickSpacing.lg),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ReviewCard extends StatelessWidget {
+  const _ReviewCard({required this.result});
+  final QuestionResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final (prompt, correct) = switch (result.question) {
+      MultipleChoiceQuestion mc => (mc.prompt, mc.correctAnswer),
+      WordOrderQuestion wo      => (wo.prompt, wo.correctSentence.join(' ')),
+      SpeakingQuestion _        => ('Speaking exercise', '—'),
+    };
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: FlickSpacing.md),
+      padding: const EdgeInsets.all(FlickSpacing.md),
+      decoration: BoxDecoration(
+        color: FlickColors.errorDim,
+        borderRadius: const BorderRadius.all(FlickRadius.lg),
+        border: Border.all(color: FlickColors.error.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            prompt,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: FlickColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: FlickSpacing.xs),
+          Row(
+            children: [
+              const Icon(Icons.check_rounded, size: 14, color: FlickColors.success),
+              const SizedBox(width: FlickSpacing.xs),
+              Expanded(
+                child: Text(
+                  correct,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: FlickColors.success,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

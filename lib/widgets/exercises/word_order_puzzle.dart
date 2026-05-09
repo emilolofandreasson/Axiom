@@ -63,14 +63,9 @@ class _WordOrderPuzzleState extends State<WordOrderPuzzle> {
     final word = _slots[slotIndex];
     if (word == null) return;
 
-    // Return word to its original bank position.
-    final origIndex = widget.question.shuffledWords.indexOf(word,
-        _bank.indexWhere((w) => w == null));
-
     HapticFeedback.selectionClick();
     setState(() {
       _slots[slotIndex] = null;
-      // Find first empty bank slot and restore
       final empty = _bank.indexOf(null);
       if (empty != -1) _bank[empty] = word;
     });

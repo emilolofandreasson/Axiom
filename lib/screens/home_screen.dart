@@ -33,11 +33,24 @@ WordPair? _wordOfDay(String langCode) {
   return allPairs[index];
 }
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Generate an AI lesson as soon as home screen loads.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(lessonProvider.notifier).generateInitialLesson();
+    });
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final language    = ref.watch(languageProvider);
     final lessonState = ref.watch(lessonProvider);
     final sagaState   = ref.watch(sagaProvider);
@@ -222,9 +235,11 @@ class _DailyLessonCard extends StatelessWidget {
     final hasContent = language.hasContent;
     final lesson     = lessonState.lesson;
     final lessonNum  = lessonState.lessonIndex + 1;
+    final generating = lessonState.isGenerating;
+    final failed     = lessonState.lastGenerationFailed;
 
     return GestureDetector(
-      onTap: hasContent
+      onTap: hasContent && !generating
           ? () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const DailyLessonScreen()),
@@ -236,49 +251,66 @@ class _DailyLessonCard extends StatelessWidget {
         decoration: BoxDecoration(
           color:        hasContent ? FlickColors.surface : FlickColors.surfaceDim,
           borderRadius: const BorderRadius.all(FlickRadius.lg),
-          border:       Border.all(color: FlickColors.border),
+          border: Border.all(
+            color: lesson.isAiGenerated
+                ? FlickColors.primary.withValues(alpha: 0.4)
+                : FlickColors.border,
+            width: lesson.isAiGenerated ? 1.5 : 1,
+          ),
         ),
         child: hasContent
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+            ? generating
+                ? _GeneratingContent()
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'DAILY LESSON',
-                        style: Theme.of(context).textTheme.labelSmall!.copyWith(
-                              color: FlickColors.textMuted, letterSpacing: 1.2),
+                      Row(
+                        children: [
+                          Text(
+                            'DAILY LESSON',
+                            style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                                  color: FlickColors.textMuted, letterSpacing: 1.2),
+                          ),
+                          const Spacer(),
+                          if (lesson.isAiGenerated)
+                            _AiBadge()
+                          else if (failed)
+                            _FallbackBadge()
+                          else
+                            Text(
+                              '$lessonNum / $totalLessons',
+                              style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                                    color: FlickColors.primary, letterSpacing: 0.5),
+                            ),
+                        ],
                       ),
-                      const Spacer(),
-                      Text(
-                        '$lessonNum / $totalLessons',
-                        style: Theme.of(context).textTheme.labelSmall!.copyWith(
-                              color: FlickColors.primary, letterSpacing: 0.5),
+                      const SizedBox(height: FlickSpacing.sm),
+                      Text(lesson.title,
+                          style: Theme.of(context).textTheme.headlineMedium),
+                      const SizedBox(height: FlickSpacing.xs),
+                      Text(lesson.description,
+                          style: Theme.of(context).textTheme.bodyMedium),
+                      const SizedBox(height: FlickSpacing.md),
+                      Row(
+                        children: [
+                          _MiniChip(
+                            icon:  Icons.signal_cellular_alt_rounded,
+                            label: lesson.cefrLevel,
+                          ),
+                          const SizedBox(width: FlickSpacing.sm),
+                          _MiniChip(
+                            icon:  Icons.timer_outlined,
+                            label: '~${lesson.estimatedMinutes} min',
+                          ),
+                          const SizedBox(width: FlickSpacing.sm),
+                          _MiniChip(
+                            icon:  Icons.bolt_rounded,
+                            label: '${lesson.xpReward} XP',
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                  const SizedBox(height: FlickSpacing.sm),
-                  Text(lesson.title,
-                      style: Theme.of(context).textTheme.headlineMedium),
-                  const SizedBox(height: FlickSpacing.xs),
-                  Text(lesson.description,
-                      style: Theme.of(context).textTheme.bodyMedium),
-                  const SizedBox(height: FlickSpacing.md),
-                  Row(
-                    children: [
-                      _MiniChip(
-                        icon:  Icons.timer_outlined,
-                        label: '~${lesson.estimatedMinutes} min',
-                      ),
-                      const SizedBox(width: FlickSpacing.sm),
-                      _MiniChip(
-                        icon:  Icons.bolt_rounded,
-                        label: '${lesson.xpReward} XP',
-                      ),
-                    ],
-                  ),
-                ],
-              )
+                  )
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -298,6 +330,68 @@ class _DailyLessonCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _GeneratingContent extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('DAILY LESSON',
+          style: Theme.of(context).textTheme.labelSmall!.copyWith(
+              color: FlickColors.textMuted, letterSpacing: 1.2)),
+      const SizedBox(height: FlickSpacing.md),
+      Row(
+        children: [
+          const SizedBox(
+            width: 16, height: 16,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: FlickColors.primary),
+          ),
+          const SizedBox(width: FlickSpacing.sm),
+          Text('Generating your lesson…',
+              style: Theme.of(context).textTheme.bodyMedium),
+        ],
+      ),
+    ],
+  );
+}
+
+class _AiBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+    decoration: BoxDecoration(
+      color:        FlickColors.primaryDim,
+      borderRadius: const BorderRadius.all(FlickRadius.full),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.auto_awesome_rounded,
+            size: 11, color: FlickColors.primary),
+        const SizedBox(width: 3),
+        Text('AI',
+            style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                color: FlickColors.primary, fontSize: 10)),
+      ],
+    ),
+  );
+}
+
+class _FallbackBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+    decoration: BoxDecoration(
+      color:        FlickColors.surfaceDim,
+      borderRadius: const BorderRadius.all(FlickRadius.full),
+      border:       Border.all(color: FlickColors.border),
+    ),
+    child: Text('Seed',
+        style: Theme.of(context).textTheme.labelSmall!.copyWith(
+            color: FlickColors.textMuted, fontSize: 10)),
+  );
 }
 
 class _MiniChip extends StatelessWidget {

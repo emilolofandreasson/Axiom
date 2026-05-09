@@ -12,6 +12,7 @@ import '../services/auth_service.dart';
 import '../services/profile_service.dart';
 import 'api_key_screen.dart';
 import 'auth_screen.dart';
+import 'debug_screen.dart';
 import 'edit_profile_screen.dart';
 import 'friends_screen.dart';
 
@@ -276,6 +277,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const SizedBox(height: FlickSpacing.md),
 
             _AiKeyCard().animate().fadeIn(delay: 400.ms),
+
+            const SizedBox(height: FlickSpacing.lg),
+
+            // Database test button
+            OutlinedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DebugScreen()),
+              ),
+              icon: const Icon(Icons.biotech_rounded, size: 18),
+              label: const Text('Test database connection'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: FlickColors.textSecondary,
+                side: const BorderSide(color: FlickColors.border),
+              ),
+            ).animate().fadeIn(delay: 420.ms),
 
             const SizedBox(height: FlickSpacing.lg),
 

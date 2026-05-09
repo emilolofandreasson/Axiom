@@ -35,10 +35,14 @@ class LessonState {
     this.status = LessonStatus.idle,
     this.currentAnswerState = AnswerState.unanswered,
     this.questionStartedAt,
+    this.isGenerating = false,
+    this.lastGenerationFailed = false,
   });
 
   final Lesson lesson;
   final int lessonIndex;
+  final bool isGenerating;
+  final bool lastGenerationFailed;
   final int currentIndex;
   final List<QuestionResult> results;
   final LessonStatus status;
@@ -64,15 +68,19 @@ class LessonState {
     LessonStatus? status,
     AnswerState? currentAnswerState,
     DateTime? questionStartedAt,
+    bool? isGenerating,
+    bool? lastGenerationFailed,
   }) =>
       LessonState(
-        lesson:               lesson               ?? this.lesson,
-        lessonIndex:          lessonIndex          ?? this.lessonIndex,
-        currentIndex:         currentIndex         ?? this.currentIndex,
-        results:              results              ?? this.results,
-        status:               status               ?? this.status,
-        currentAnswerState:   currentAnswerState   ?? this.currentAnswerState,
-        questionStartedAt:    questionStartedAt    ?? this.questionStartedAt,
+        lesson:                lesson               ?? this.lesson,
+        lessonIndex:           lessonIndex          ?? this.lessonIndex,
+        currentIndex:          currentIndex         ?? this.currentIndex,
+        results:               results              ?? this.results,
+        status:                status               ?? this.status,
+        currentAnswerState:    currentAnswerState   ?? this.currentAnswerState,
+        questionStartedAt:     questionStartedAt    ?? this.questionStartedAt,
+        isGenerating:          isGenerating         ?? this.isGenerating,
+        lastGenerationFailed:  lastGenerationFailed ?? this.lastGenerationFailed,
       );
 }
 
@@ -112,6 +120,8 @@ class LessonNotifier extends Notifier<LessonState> {
     final language = ref.read(languageProvider);
     final saga     = ref.read(sagaProvider);
 
+    state = state.copyWith(isGenerating: true, lastGenerationFailed: false);
+
     final generated = await lessonGenerator.generate(
       languageCode: language.code,
       languageName: language.name,
@@ -120,17 +130,21 @@ class LessonNotifier extends Notifier<LessonState> {
 
     if (generated != null) {
       state = state.copyWith(
-        lesson:      generated,
-        lessonIndex: state.lessonIndex + 1,
-        status:      LessonStatus.idle,
+        lesson:               generated,
+        lessonIndex:          state.lessonIndex + 1,
+        status:               LessonStatus.idle,
+        isGenerating:         false,
+        lastGenerationFailed: false,
       );
     } else {
       final lessons   = kLessonsByLanguage[language.code] ?? kLessonsByLanguage['es']!;
       final nextIndex = (state.lessonIndex + 1) % lessons.length;
       state = state.copyWith(
-        lesson:      lessons[nextIndex],
-        lessonIndex: nextIndex,
-        status:      LessonStatus.idle,
+        lesson:               lessons[nextIndex],
+        lessonIndex:          nextIndex,
+        status:               LessonStatus.idle,
+        isGenerating:         false,
+        lastGenerationFailed: true,
       );
     }
     startLesson();
@@ -140,6 +154,8 @@ class LessonNotifier extends Notifier<LessonState> {
     final language = ref.read(languageProvider);
     final saga     = ref.read(sagaProvider);
 
+    state = state.copyWith(isGenerating: true, lastGenerationFailed: false);
+
     final generated = await lessonGenerator.generate(
       languageCode: language.code,
       languageName: language.name,
@@ -147,7 +163,18 @@ class LessonNotifier extends Notifier<LessonState> {
     );
 
     if (generated != null) {
-      state = state.copyWith(lesson: generated, lessonIndex: 0, status: LessonStatus.idle);
+      state = state.copyWith(
+        lesson:               generated,
+        lessonIndex:          0,
+        status:               LessonStatus.idle,
+        isGenerating:         false,
+        lastGenerationFailed: false,
+      );
+    } else {
+      state = state.copyWith(
+        isGenerating:         false,
+        lastGenerationFailed: true,
+      );
     }
   }
 

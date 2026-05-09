@@ -26,6 +26,8 @@ class Lesson {
   final List<Question> questions;
   final int estimatedMinutes;
   final int xpReward;
+
+  bool get isAiGenerated => id.startsWith('ai-');
 }
 
 @immutable

@@ -2,23 +2,34 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flick_sdk/flick_sdk.dart';
+
+// Uncomment after running: flutterfire configure
+// import 'package:firebase_core/firebase_core.dart';
+// import 'firebase_options.dart';
+
 import 'config/env.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/home_screen.dart';
+import 'services/auth_service.dart';
+import 'services/firebase_sync_service.dart';
+
+final authService = AuthService(hmacSalt: Env.hmacSalt);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Lock to portrait — single-column lesson layout.
+  // Uncomment after running: flutterfire configure
+  // await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // await authService.initialize();
+
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // Transparent status bar over our warm background.
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor:           Colors.transparent,
-    statusBarIconBrightness:  Brightness.dark,
+    statusBarColor:          Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
   ));
 
   await EventSensor.instance.initialize(
@@ -29,21 +40,16 @@ Future<void> main() async {
     ),
   );
 
-  if (Env.eventHubEndpoint.isNotEmpty) {
-    final sync = SyncService(
-      eventHubEndpoint: Env.eventHubEndpoint,
-      sasToken: Env.eventHubSasToken,
-    );
-    await sync.sync();
-  }
-
   EventSensor.instance.emit('app_opened', {
     'app_version': '1.0.0',
-    'platform': 'web',
+    'platform':    'web',
   });
 
-  final observer = _LifecycleObserver();
-  WidgetsBinding.instance.addObserver(observer);
+  // Sync buffered events to Firestore on startup.
+  // Uncomment after Firebase is initialized:
+  // FirebaseSyncService().sync();
+
+  WidgetsBinding.instance.addObserver(_LifecycleObserver());
 
   runApp(const ProviderScope(child: AxiomApp()));
 }
@@ -64,10 +70,10 @@ class AxiomApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title:        'Axiom',
+      title:                   'Axiom',
       debugShowCheckedModeBanner: false,
-      theme:        buildAppTheme(),
-      home:         const HomeScreen(),
+      theme:                   buildAppTheme(),
+      home:                    const HomeScreen(),
     );
   }
 }

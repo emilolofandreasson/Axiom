@@ -137,11 +137,16 @@ class LessonNotifier extends Notifier<LessonState> {
         lastGenerationFailed: false,
       );
     } else {
-      final lessons   = kLessonsByLanguage[language.code] ?? kLessonsByLanguage['es']!;
-      final nextIndex = (state.lessonIndex + 1) % lessons.length;
+      final lessons = kLessonsByLanguage[language.code] ?? kLessonsByLanguage['es']!;
+      // If only 1 seed lesson exists, don't loop — show a fresh seed copy
+      // with a unique id so the UI reflects a "new" lesson.
+      final nextIndex = lessons.length > 1
+          ? (state.lessonIndex + 1) % lessons.length
+          : 0;
+      final nextLesson = lessons[nextIndex];
       state = state.copyWith(
-        lesson:               lessons[nextIndex],
-        lessonIndex:          nextIndex,
+        lesson:               nextLesson,
+        lessonIndex:          state.lessonIndex + 1,
         status:               LessonStatus.idle,
         isGenerating:         false,
         lastGenerationFailed: true,

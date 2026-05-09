@@ -9,6 +9,6 @@ abstract final class Env {
   );
   static const proxyUrl = String.fromEnvironment(
     'PROXY_URL',
-    defaultValue: '',
+    defaultValue: 'https://proxy-taupe-eight-41.vercel.app',
   );
 }

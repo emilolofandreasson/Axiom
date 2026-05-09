@@ -1,0 +1,43 @@
+name: axiom
+description: Axiom — premium language learning, zero paywalls.
+version: 1.0.0+1
+publish_to: none
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+
+  # Fonts & icons
+  google_fonts: ^6.2.1
+
+  # Local persistence (event queue + lesson state)
+  shared_preferences: ^2.2.3
+
+  # Unique IDs (event_id, session_id)
+  uuid: ^4.4.0
+
+  # Animations
+  flutter_animate: ^4.5.0
+
+  # Haptics
+  flutter_haptic: ^0.0.1+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  riverpod_generator: ^2.4.0
+  build_runner: ^2.4.9
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/

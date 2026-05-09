@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flick_sdk/flick_sdk.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/question.dart';
 import '../../providers/lesson_provider.dart';
@@ -73,7 +74,7 @@ class _MultipleChoiceCardState extends State<MultipleChoiceCard> {
         // Hint
         if (widget.question.hintText != null) ...[
           const SizedBox(height: FlickSpacing.md),
-          _HintChip(text: widget.question.hintText!),
+          _HintChip(text: widget.question.hintText!, questionId: widget.question.id),
         ],
       ],
     );
@@ -186,8 +187,9 @@ class _OptionTile extends StatelessWidget {
 }
 
 class _HintChip extends StatefulWidget {
-  const _HintChip({required this.text});
+  const _HintChip({required this.text, required this.questionId});
   final String text;
+  final String questionId;
 
   @override
   State<_HintChip> createState() => _HintChipState();
@@ -199,7 +201,12 @@ class _HintChipState extends State<_HintChip> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => setState(() => _revealed = true),
+      onTap: _revealed ? null : () {
+        setState(() => _revealed = true);
+        EventSensor.instance.emit('hint_viewed', {
+          'question_id': widget.questionId,
+        });
+      },
       child: AnimatedContainer(
         duration: 300.ms,
         padding: const EdgeInsets.symmetric(

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flick_sdk/flick_sdk.dart';
 import '../models/language.dart';
 
 class LanguageNotifier extends Notifier<Language> {
@@ -6,7 +7,12 @@ class LanguageNotifier extends Notifier<Language> {
   Language build() => kLanguages.first;
 
   void selectLanguage(Language language) {
+    final previous = state.code;
     state = language;
+    EventSensor.instance.emit('language_selected', {
+      'language_code':  language.code,
+      'previous_code':  previous,
+    });
   }
 }
 

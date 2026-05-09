@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flick_sdk/flick_sdk.dart';
+import 'config/env.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/home_screen.dart';
 
@@ -28,7 +29,33 @@ Future<void> main() async {
     ),
   );
 
+  if (Env.eventHubEndpoint.isNotEmpty) {
+    final sync = SyncService(
+      eventHubEndpoint: Env.eventHubEndpoint,
+      sasToken: Env.eventHubSasToken,
+    );
+    await sync.sync();
+  }
+
+  EventSensor.instance.emit('app_opened', {
+    'app_version': '1.0.0',
+    'platform': 'web',
+  });
+
+  final observer = _LifecycleObserver();
+  WidgetsBinding.instance.addObserver(observer);
+
   runApp(const ProviderScope(child: AxiomApp()));
+}
+
+class _LifecycleObserver extends WidgetsBindingObserver {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      EventSensor.instance.flushOnBackground();
+    }
+  }
 }
 
 class AxiomApp extends StatelessWidget {

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flick_sdk/flick_sdk.dart';
 import '../models/puzzle_level.dart';
 
 class SagaState {
@@ -50,6 +51,7 @@ class SagaNotifier extends Notifier<SagaState> {
     final newStreak = noRetries ? state.streakCount + 1 : 0;
     // Award a Reveal powerup every 3 clean completions.
     final earnedPowerup = newStreak > 0 && newStreak % 3 == 0;
+    final previousStreak = state.streakCount;
 
     state = state.copyWith(
       completedIds:   {...state.completedIds, levelId},
@@ -57,12 +59,25 @@ class SagaNotifier extends Notifier<SagaState> {
       streakCount:    newStreak,
       revealPowerups: state.revealPowerups + (earnedPowerup ? 1 : 0),
     );
+    EventSensor.instance.emit('streak_updated', {
+      'new_streak':      newStreak,
+      'previous_streak': previousStreak,
+      'level_id':        levelId,
+      'clean_run':       noRetries,
+    });
   }
 
   void recordRetry(String levelId) {
+    final previousStreak = state.streakCount;
     final updated = Map<String, int>.from(state.retries);
     updated[levelId] = (updated[levelId] ?? 0) + 1;
     state = state.copyWith(retries: updated, streakCount: 0);
+    EventSensor.instance.emit('streak_updated', {
+      'new_streak':      0,
+      'previous_streak': previousStreak,
+      'level_id':        levelId,
+      'clean_run':       false,
+    });
   }
 
   // Returns false if no powerups remain.

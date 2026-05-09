@@ -73,6 +73,8 @@ class LessonState {
 // ---------------------------------------------------------------------------
 
 class LessonNotifier extends Notifier<LessonState> {
+  DateTime? _lessonStartedAt;
+
   @override
   LessonState build() => LessonState(
         lesson: kSeedLesson,
@@ -80,6 +82,7 @@ class LessonNotifier extends Notifier<LessonState> {
       );
 
   void startLesson() {
+    _lessonStartedAt = DateTime.now();
     state = state.copyWith(
       status:            LessonStatus.inProgress,
       currentIndex:      0,
@@ -87,10 +90,6 @@ class LessonNotifier extends Notifier<LessonState> {
       questionStartedAt: DateTime.now(),
     );
 
-    EventSensor.instance.emit('session_started', {
-      'app_id':   'axiom',
-      'platform': 'web',
-    });
     EventSensor.instance.emit('lesson_started', {
       'lesson_id':      state.lesson.id,
       'cefr_level':     state.lesson.cefrLevel,
@@ -162,7 +161,7 @@ class LessonNotifier extends Notifier<LessonState> {
       'exercise_count':  state.totalQuestions,
       'correct_count':   state.correctCount,
       'accuracy_pct':    state.accuracy,
-      'duration_seconds': 0,
+      'duration_seconds': _lessonStartedAt != null ? DateTime.now().difference(_lessonStartedAt!).inSeconds : 0,
       'xp_earned':       state.lesson.xpReward,
     });
   }

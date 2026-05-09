@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flick_sdk/flick_sdk.dart';
 import 'core/theme/app_theme.dart';
-import 'screens/daily_lesson_screen.dart';
+import 'screens/saga_map_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,7 +40,7 @@ class AxiomApp extends StatelessWidget {
       title:        'Axiom',
       debugShowCheckedModeBanner: false,
       theme:        buildAppTheme(),
-      home:         const DailyLessonScreen(),
+      home:         const SagaMapScreen(),
     );
   }
 }

@@ -63,10 +63,9 @@ class DailyLessonScreen extends ConsumerWidget {
               // Exercise body
               Expanded(
                 child: _ExerciseBody(
-                  key:        ValueKey(state.currentQuestion.id),
-                  state:      state,
-                  notifier:   notifier,
-                  subjectId:  ref.read(subjectIdProvider),
+                  key:      ValueKey(state.currentQuestion.id),
+                  state:    state,
+                  notifier: notifier,
                 ),
               ),
 
@@ -265,12 +264,10 @@ class _ExerciseBody extends ConsumerWidget {
     super.key,
     required this.state,
     required this.notifier,
-    required this.subjectId,
   });
 
   final LessonState state;
   final LessonNotifier notifier;
-  final String subjectId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -289,7 +286,6 @@ class _ExerciseBody extends ConsumerWidget {
         ),
       SpeakingQuestion sp => AIChatPanel(
           question:   sp,
-          subjectId:  subjectId,
           onComplete: notifier.advance,
         ),
     };

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flick_sdk/flick_sdk.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/lesson.dart';
 import '../../models/question.dart';
-import '../../core/events/event_logger.dart';
 
 // ---------------------------------------------------------------------------
 // AIChatPanel
@@ -16,12 +16,10 @@ class AIChatPanel extends StatefulWidget {
   const AIChatPanel({
     super.key,
     required this.question,
-    required this.subjectId,
     required this.onComplete,
   });
 
   final SpeakingQuestion question;
-  final String subjectId;
   final VoidCallback onComplete;
 
   @override
@@ -69,16 +67,12 @@ class _AIChatPanelState extends State<AIChatPanel> {
     );
     _addMessage(userMsg);
 
-    logger.record(
-      eventType: 'chat_message_sent',
-      subjectId: widget.subjectId,
-      properties: {
-        'question_id': widget.question.id,
-        'lesson_id':   widget.question.lessonId,
-        'message_len': text.length,
-        'turn_number': _messages.length,
-      },
-    );
+    EventSensor.instance.emit('chat_message_sent', {
+      'lesson_id':   widget.question.lessonId,
+      'question_id': widget.question.id,
+      'message_len': text.length,
+      'turn_number': _messages.length,
+    });
 
     setState(() => _isTyping = true);
     _scrollToBottom();

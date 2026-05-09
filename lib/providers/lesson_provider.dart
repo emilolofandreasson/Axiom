@@ -1,12 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flick_sdk/flick_sdk.dart';
 import '../models/lesson.dart';
 import '../models/question.dart';
-import '../core/events/event_logger.dart';
-
-// ---------------------------------------------------------------------------
-// Auth stub — replaced by real Entra ID token in Phase 2.
-// ---------------------------------------------------------------------------
-final subjectIdProvider = Provider<String>((_) => 'dev-subject-00000000');
 
 // ---------------------------------------------------------------------------
 // Lesson state
@@ -84,8 +79,6 @@ class LessonNotifier extends Notifier<LessonState> {
         status: LessonStatus.idle,
       );
 
-  String get _subjectId => ref.read(subjectIdProvider);
-
   void startLesson() {
     state = state.copyWith(
       status:            LessonStatus.inProgress,
@@ -94,16 +87,16 @@ class LessonNotifier extends Notifier<LessonState> {
       questionStartedAt: DateTime.now(),
     );
 
-    logger.record(
-      eventType: 'lesson_started',
-      subjectId: _subjectId,
-      properties: {
-        'lesson_id':      state.lesson.id,
-        'cefr_level':     state.lesson.cefrLevel,
-        'skill_tag':      state.lesson.skillTag,
-        'question_count': state.totalQuestions,
-      },
-    );
+    EventSensor.instance.emit('session_started', {
+      'app_id':   'axiom',
+      'platform': 'web',
+    });
+    EventSensor.instance.emit('lesson_started', {
+      'lesson_id':      state.lesson.id,
+      'cefr_level':     state.lesson.cefrLevel,
+      'skill_tag':      state.lesson.skillTag,
+      'question_count': state.totalQuestions,
+    });
   }
 
   void submitAnswer(Object answer) {
@@ -134,19 +127,15 @@ class LessonNotifier extends Notifier<LessonState> {
       results: [...state.results, result],
     );
 
-    logger.record(
-      eventType: 'answer_submitted',
-      subjectId: _subjectId,
-      properties: {
-        'lesson_id':      state.lesson.id,
-        'question_id':    q.id,
-        'question_type':  q.runtimeType.toString(),
-        'skill_tag':      q.skillTag,
-        'is_correct':     isCorrect,
-        'time_taken_ms':  elapsed,
-        'cefr_level':     q.cefrLevel,
-      },
-    );
+    EventSensor.instance.emit('answer_submitted', {
+      'lesson_id':     state.lesson.id,
+      'question_id':   q.id,
+      'question_type': q.runtimeType.toString(),
+      'skill_tag':     q.skillTag,
+      'is_correct':    isCorrect,
+      'time_taken_ms': elapsed,
+      'cefr_level':    q.cefrLevel,
+    });
   }
 
   void advance() {
@@ -165,19 +154,17 @@ class LessonNotifier extends Notifier<LessonState> {
   void _completeLesson() {
     state = state.copyWith(status: LessonStatus.completed);
 
-    logger.record(
-      eventType: 'lesson_completed',
-      subjectId: _subjectId,
-      properties: {
-        'lesson_id':       state.lesson.id,
-        'cefr_level':      state.lesson.cefrLevel,
-        'skill_tag':       state.lesson.skillTag,
-        'exercise_count':  state.totalQuestions,
-        'correct_count':   state.correctCount,
-        'accuracy_pct':    state.accuracy,
-        'xp_earned':       state.lesson.xpReward,
-      },
-    );
+    EventSensor.instance.emit('lesson_completed', {
+      'lesson_id':       state.lesson.id,
+      'course_language': state.lesson.courseLanguage,
+      'cefr_level':      state.lesson.cefrLevel,
+      'skill_tag':       state.lesson.skillTag,
+      'exercise_count':  state.totalQuestions,
+      'correct_count':   state.correctCount,
+      'accuracy_pct':    state.accuracy,
+      'duration_seconds': 0,
+      'xp_earned':       state.lesson.xpReward,
+    });
   }
 
   bool _listEquals(List<String> a, List<String> b) {

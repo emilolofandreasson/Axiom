@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flick_sdk/flick_sdk.dart';
 import 'core/theme/app_theme.dart';
-import 'core/events/event_logger.dart';
 import 'screens/daily_lesson_screen.dart';
 
 Future<void> main() async {
@@ -20,7 +20,13 @@ Future<void> main() async {
     statusBarIconBrightness:  Brightness.dark,
   ));
 
-  await EventLogger.instance.initialize();
+  await EventSensor.instance.initialize(
+    config: const SensorConfig(
+      appId:      'axiom',
+      appVersion: '1.0.0',
+      platform:   'web',
+    ),
+  );
 
   runApp(const ProviderScope(child: AxiomApp()));
 }

@@ -7,4 +7,8 @@ abstract final class Env {
     'GEMINI_API_KEY',
     defaultValue: '',
   );
+  static const proxyUrl = String.fromEnvironment(
+    'PROXY_URL',
+    defaultValue: '',
+  );
 }

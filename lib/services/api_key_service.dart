@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flick_sdk/flick_sdk.dart';
+import '../config/env.dart';
 import '../main.dart' show lessonGenerator;
 import '../services/lesson_generator.dart';
 
@@ -78,8 +79,9 @@ class ApiKeyService {
   }
 
   void _applyToGenerator(String? key) {
-    final bridge = (key != null && key.isNotEmpty)
-        ? GeminiBridge(apiKey: key)
+    final proxyUrl = Env.proxyUrl.isNotEmpty ? Env.proxyUrl : null;
+    final bridge   = (key != null && key.isNotEmpty)
+        ? GeminiBridge(apiKey: key, proxyUrl: proxyUrl)
         : StubEdgeAiBridge();
     bridge.loadModel('');
     lessonGenerator = LessonGenerator(bridge: bridge);

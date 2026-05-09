@@ -4,18 +4,41 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../core/theme/app_theme.dart';
 import '../models/language.dart';
 import '../models/puzzle_level.dart';
+import '../models/user_profile.dart';
 import '../providers/language_provider.dart';
 import '../providers/saga_provider.dart';
 import '../main.dart' show authService, apiKeyService;
 import '../services/auth_service.dart';
+import '../services/profile_service.dart';
 import 'api_key_screen.dart';
 import 'auth_screen.dart';
+import 'edit_profile_screen.dart';
+import 'friends_screen.dart';
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  UserProfile? _profile;
+  final _profileService = ProfileService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final p = await _profileService.loadProfile();
+    if (mounted) setState(() => _profile = p);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final saga     = ref.watch(sagaProvider);
     final language = ref.watch(languageProvider);
 
@@ -28,7 +51,24 @@ class ProfileScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: FlickColors.background,
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(
+        title: const Text('Profile'),
+        actions: [
+          if (_profile != null)
+            TextButton(
+              onPressed: () async {
+                final updated = await Navigator.push<UserProfile>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EditProfileScreen(profile: _profile!),
+                  ),
+                );
+                if (updated != null) setState(() => _profile = updated);
+              },
+              child: const Text('Edit'),
+            ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(FlickSpacing.lg),
         child: Column(
@@ -37,48 +77,86 @@ class ProfileScreen extends ConsumerWidget {
 
             // Identity card
             _SectionCard(
-              child: Row(
+              child: Column(
                 children: [
-                  Container(
-                    width: 52, height: 52,
-                    decoration: BoxDecoration(
-                      color:  FlickColors.primaryDim,
-                      shape:  BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.person_rounded,
-                        color: FlickColors.primary, size: 28),
-                  ),
-                  const SizedBox(width: FlickSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          authService.isAnonymous
-                              ? 'Guest learner'
-                              : (authService.currentUser?.email ?? 'Learner'),
-                          style: Theme.of(context).textTheme.labelLarge,
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: FlickColors.primaryDim,
+                        backgroundImage: _profile?.photoUrl != null
+                            ? NetworkImage(_profile!.photoUrl!)
+                            : null,
+                        child: _profile?.photoUrl == null
+                            ? const Icon(Icons.person_rounded,
+                                color: FlickColors.primary, size: 28)
+                            : null,
+                      ),
+                      const SizedBox(width: FlickSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _profile?.name.isNotEmpty == true
+                                  ? _profile!.name
+                                  : (authService.isAnonymous
+                                      ? 'Guest learner'
+                                      : (authService.currentUser?.email ?? 'Learner')),
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _profile?.bio.isNotEmpty == true
+                                  ? _profile!.bio
+                                  : (authService.isAnonymous
+                                      ? 'Sign in to save progress across devices'
+                                      : 'Tap Edit to add a bio'),
+                              style: Theme.of(context).textTheme.bodyMedium,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          authService.isAnonymous
-                              ? 'Sign in to save progress across devices'
-                              : 'Signed in',
-                          style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      if (authService.isAnonymous)
+                        TextButton(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  AuthScreen(authService: authService),
+                            ),
+                          ),
+                          child: const Text('Sign in'),
                         ),
-                      ],
-                    ),
+                    ],
                   ),
-                  if (authService.isAnonymous)
-                    TextButton(
+                  const SizedBox(height: FlickSpacing.md),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
                       onPressed: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => AuthScreen(authService: authService),
+                          builder: (_) => FriendsScreen(
+                              myProfile: _profile ??
+                                  UserProfile(
+                                    uid: authService.currentUser?.uid ?? '',
+                                  )),
                         ),
                       ),
-                      child: const Text('Sign in'),
+                      icon: const Icon(Icons.people_rounded, size: 18),
+                      label: const Text('Friends'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: FlickColors.primary,
+                        side: const BorderSide(color: FlickColors.border),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.all(FlickRadius.full),
+                        ),
+                      ),
                     ),
+                  ),
                 ],
               ),
             ).animate().fadeIn(duration: 300.ms),

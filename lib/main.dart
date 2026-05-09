@@ -46,7 +46,8 @@ Future<void> main() async {
 
   // 3. Fall back to compile-time key (dev convenience).
   if (Env.geminiApiKey.isNotEmpty) {
-    final bridge = GeminiBridge(apiKey: Env.geminiApiKey);
+    final proxy  = Env.proxyUrl.isNotEmpty ? Env.proxyUrl : null;
+    final bridge = GeminiBridge(apiKey: Env.geminiApiKey, proxyUrl: proxy);
     await bridge.loadModel('');
     lessonGenerator = LessonGenerator(bridge: bridge);
   }

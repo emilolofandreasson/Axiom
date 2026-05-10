@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flick_sdk/flick_sdk.dart';
 import '../core/theme/app_theme.dart';
 import '../models/puzzle_level.dart';
+import '../models/language_level.dart';
+import '../providers/language_provider.dart';
 import '../providers/saga_provider.dart';
 import '../widgets/puzzle/match_grid.dart';
 
@@ -27,9 +29,13 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
       _timeSeconds  = timeSeconds;
     });
 
+    final langCode  = ref.read(languageProvider).code;
+    final langXp    = ref.read(sagaProvider).xpForLanguage(langCode);
+    final xpReward  = levelForXp(langXp).xpReward;
     ref.read(sagaProvider.notifier).completeLevel(
           widget.level.id,
-          widget.level.xpReward,
+          xpReward,
+          languageCode: langCode,
         );
 
     EventSensor.instance.emit('level_completed', {
@@ -38,7 +44,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
       'course_language': widget.level.courseLanguage,
       'attempts':        _attempt,
       'time_seconds':    timeSeconds,
-      'xp_earned':       widget.level.xpReward,
+      'xp_earned':       xpReward,
     });
   }
 

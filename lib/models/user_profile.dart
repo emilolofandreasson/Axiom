@@ -29,19 +29,19 @@ class UserProfile {
     photoUrl:       photoUrl       ?? this.photoUrl,
   );
 
-  factory UserProfile.fromFirestore(String uid, Map<String, dynamic> data) =>
+  factory UserProfile.fromMap(String uid, Map<String, dynamic> data) =>
       UserProfile(
         uid:            uid,
-        name:           data['name']           as String? ?? '',
-        bio:            data['bio']            as String? ?? '',
-        nativeLanguage: data['nativeLanguage'] as String? ?? 'en',
-        photoUrl:       data['photoUrl']       as String?,
+        name:           data['name']            as String? ?? '',
+        bio:            data['bio']             as String? ?? '',
+        nativeLanguage: data['native_language'] as String? ?? 'en',
+        photoUrl:       data['photo_url']       as String?,
       );
 
-  Map<String, dynamic> toFirestore() => {
-    'name':           name,
-    'bio':            bio,
-    'nativeLanguage': nativeLanguage,
-    if (photoUrl != null) 'photoUrl': photoUrl,
+  Map<String, dynamic> toMap() => {
+    'name':            name,
+    'bio':             bio,
+    'native_language': nativeLanguage,
+    if (photoUrl != null) 'photo_url': photoUrl,
   };
 }

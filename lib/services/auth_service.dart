@@ -1,54 +1,42 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flick_sdk/flick_sdk.dart';
 
 class AuthService {
   AuthService({required String hmacSalt}) : _hmacSalt = hmacSalt;
 
   final String _hmacSalt;
-  static const _storage   = FlutterSecureStorage();
-  static const _kAnonKey  = 'flick_anon_subject_id';
+  SupabaseClient get _client => Supabase.instance.client;
 
-  final _auth = FirebaseAuth.instance;
+  void initialize() {
+    // Restore existing session immediately if available.
+    final user = _client.auth.currentUser;
+    if (user != null) _applySubjectId(user);
 
-  Future<void> initialize() async {
-    try {
-      final user = _auth.currentUser ?? await _signInAnonymously();
-      _applySubjectId(user);
-    } catch (e) {
-      debugPrint('[AuthService] anonymous sign-in failed: $e');
-      // Fallback — app runs without a Firebase identity.
-      // Enable Anonymous auth in Firebase Console to fix this.
-    }
-
-    _auth.authStateChanges().listen((user) {
+    _client.auth.onAuthStateChange.listen((state) {
+      final user = state.session?.user;
       if (user != null) _applySubjectId(user);
     });
   }
 
-  Future<User> _signInAnonymously() async {
-    final cred = await _auth.signInAnonymously();
-    return cred.user!;
-  }
-
   void _applySubjectId(User user) {
-    final raw = user.isAnonymous
-        ? 'anon-${user.uid.substring(0, 12)}'
-        : SubjectIdHasher.hash(user.uid, _hmacSalt);
-    EventSensor.instance.setSubjectIdOverride(raw);
+    final hashed = SubjectIdHasher.hash(user.id, _hmacSalt);
+    EventSensor.instance.setSubjectIdOverride(hashed);
+    debugPrint('[AuthService] subject-id applied for user ${user.id.substring(0, 8)}…');
   }
 
-  Future<UserCredential> signInWithEmail(String email, String password) =>
-      _auth.signInWithEmailAndPassword(email: email, password: password);
+  Future<void> signInWithEmail(String email, String password) async {
+    await _client.auth.signInWithPassword(email: email, password: password);
+  }
 
-  Future<UserCredential> createAccount(String email, String password) =>
-      _auth.createUserWithEmailAndPassword(email: email, password: password);
+  Future<void> createAccount(String email, String password) async {
+    await _client.auth.signUp(email: email, password: password);
+  }
 
-  Future<void> signOut() => _auth.signOut();
+  Future<void> signOut() => _client.auth.signOut();
 
-  User? get currentUser => _auth.currentUser;
-  bool  get isAnonymous  => _auth.currentUser?.isAnonymous ?? true;
+  User? get currentUser => _client.auth.currentUser;
 
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  Stream<User?> get authStateChanges =>
+      _client.auth.onAuthStateChange.map((s) => s.session?.user);
 }

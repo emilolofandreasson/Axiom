@@ -1,6 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_profile.dart';
 
 enum FriendRequestStatus { pending, accepted, declined }
@@ -24,46 +23,44 @@ class FriendRequest {
   final FriendRequestStatus status;
   final DateTime            createdAt;
 
-  factory FriendRequest.fromFirestore(String id, Map<String, dynamic> d) =>
-      FriendRequest(
-        id:           id,
-        fromUid:      d['fromUid']      as String,
-        fromName:     d['fromName']     as String? ?? 'Unknown',
-        fromPhotoUrl: d['fromPhotoUrl'] as String?,
-        toUid:        d['toUid']        as String,
-        status: FriendRequestStatus.values.firstWhere(
-          (s) => s.name == (d['status'] as String? ?? 'pending'),
-          orElse: () => FriendRequestStatus.pending,
-        ),
-        createdAt: (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      );
+  factory FriendRequest.fromMap(Map<String, dynamic> d) => FriendRequest(
+    id:           d['id']            as String,
+    fromUid:      d['from_uid']      as String,
+    fromName:     d['from_name']     as String? ?? 'Unknown',
+    fromPhotoUrl: d['from_photo_url'] as String?,
+    toUid:        d['to_uid']        as String,
+    status: FriendRequestStatus.values.firstWhere(
+      (s) => s.name == (d['status'] as String? ?? 'pending'),
+      orElse: () => FriendRequestStatus.pending,
+    ),
+    createdAt: DateTime.parse(d['created_at'] as String),
+  );
 }
 
 class FriendService {
-  final _db   = FirebaseFirestore.instance;
-  final _auth = FirebaseAuth.instance;
-
-  String? get _uid => _auth.currentUser?.uid;
+  SupabaseClient get _db => Supabase.instance.client;
+  String? get _uid       => _db.auth.currentUser?.id;
 
   Future<void> sendRequest(UserProfile to, UserProfile from) async {
     final uid = _uid;
     if (uid == null) return;
 
+    // Prevent duplicates.
     final existing = await _db
-        .collection('friendRequests')
-        .where('fromUid', isEqualTo: uid)
-        .where('toUid', isEqualTo: to.uid)
-        .get();
-    if (existing.docs.isNotEmpty) return; // already sent
+        .from('friend_requests')
+        .select()
+        .eq('from_uid', uid)
+        .eq('to_uid', to.uid)
+        .maybeSingle();
+    if (existing != null) return;
 
     try {
-      await _db.collection('friendRequests').add({
-        'fromUid':      uid,
-        'fromName':     from.name,
-        'fromPhotoUrl': from.photoUrl,
-        'toUid':        to.uid,
-        'status':       'pending',
-        'createdAt':    FieldValue.serverTimestamp(),
+      await _db.from('friend_requests').insert({
+        'from_uid':       uid,
+        'from_name':      from.name,
+        'from_photo_url': from.photoUrl,
+        'to_uid':         to.uid,
+        'status':         'pending',
       });
     } catch (e) {
       debugPrint('[FriendService] sendRequest error: $e');
@@ -72,23 +69,16 @@ class FriendService {
 
   Future<void> acceptRequest(FriendRequest req) async {
     try {
-      final batch = _db.batch();
+      await _db
+          .from('friend_requests')
+          .update({'status': 'accepted'})
+          .eq('id', req.id);
 
-      batch.update(_db.collection('friendRequests').doc(req.id), {
-        'status': 'accepted',
-      });
-
-      // Add both directions to friends subcollections.
-      batch.set(
-        _db.collection('users').doc(req.toUid).collection('friends').doc(req.fromUid),
-        {'addedAt': FieldValue.serverTimestamp()},
-      );
-      batch.set(
-        _db.collection('users').doc(req.fromUid).collection('friends').doc(req.toUid),
-        {'addedAt': FieldValue.serverTimestamp()},
-      );
-
-      await batch.commit();
+      // Add both directions to user_friends.
+      await _db.from('user_friends').insert([
+        {'user_id': req.toUid,   'friend_id': req.fromUid},
+        {'user_id': req.fromUid, 'friend_id': req.toUid},
+      ]);
     } catch (e) {
       debugPrint('[FriendService] acceptRequest error: $e');
     }
@@ -96,9 +86,10 @@ class FriendService {
 
   Future<void> declineRequest(FriendRequest req) async {
     try {
-      await _db.collection('friendRequests').doc(req.id).update({
-        'status': 'declined',
-      });
+      await _db
+          .from('friend_requests')
+          .update({'status': 'declined'})
+          .eq('id', req.id);
     } catch (e) {
       debugPrint('[FriendService] declineRequest error: $e');
     }
@@ -108,10 +99,10 @@ class FriendService {
     final uid = _uid;
     if (uid == null) return;
     try {
-      final batch = _db.batch();
-      batch.delete(_db.collection('users').doc(uid).collection('friends').doc(friendUid));
-      batch.delete(_db.collection('users').doc(friendUid).collection('friends').doc(uid));
-      await batch.commit();
+      await _db
+          .from('user_friends')
+          .delete()
+          .or('and(user_id.eq.$uid,friend_id.eq.$friendUid),and(user_id.eq.$friendUid,friend_id.eq.$uid)');
     } catch (e) {
       debugPrint('[FriendService] removeFriend error: $e');
     }
@@ -121,12 +112,12 @@ class FriendService {
     final uid = _uid;
     if (uid == null) return const Stream.empty();
     return _db
-        .collection('friendRequests')
-        .where('toUid', isEqualTo: uid)
-        .where('status', isEqualTo: 'pending')
-        .snapshots()
-        .map((s) => s.docs
-            .map((d) => FriendRequest.fromFirestore(d.id, d.data()))
+        .from('friend_requests')
+        .stream(primaryKey: ['id'])
+        .eq('to_uid', uid)
+        .map((rows) => rows
+            .where((d) => d['status'] == 'pending')
+            .map((d) => FriendRequest.fromMap(d))
             .toList());
   }
 
@@ -134,20 +125,24 @@ class FriendService {
     final uid = _uid;
     if (uid == null) return [];
     try {
-      final snap = await _db
-          .collection('users')
-          .doc(uid)
-          .collection('friends')
-          .get();
+      final friendRows = await _db
+          .from('user_friends')
+          .select('friend_id')
+          .eq('user_id', uid);
 
-      final profiles = await Future.wait(
-        snap.docs.map((d) async {
-          final userDoc = await _db.collection('users').doc(d.id).get();
-          return UserProfile.fromFirestore(
-              d.id, userDoc.data() ?? {});
-        }),
-      );
-      return profiles;
+      final ids = (friendRows as List)
+          .map((r) => r['friend_id'] as String)
+          .toList();
+      if (ids.isEmpty) return [];
+
+      final userRows = await _db
+          .from('users')
+          .select()
+          .inFilter('id', ids);
+
+      return (userRows as List)
+          .map((d) => UserProfile.fromMap(d['id'] as String, d as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       debugPrint('[FriendService] friendsList error: $e');
       return [];
@@ -157,10 +152,12 @@ class FriendService {
   Future<bool> isFriend(String otherUid) async {
     final uid = _uid;
     if (uid == null) return false;
-    final doc = await _db
-        .collection('users').doc(uid)
-        .collection('friends').doc(otherUid)
-        .get();
-    return doc.exists;
+    final row = await _db
+        .from('user_friends')
+        .select()
+        .eq('user_id', uid)
+        .eq('friend_id', otherUid)
+        .maybeSingle();
+    return row != null;
   }
 }

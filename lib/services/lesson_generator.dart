@@ -1,16 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flick_sdk/flick_sdk.dart';
+import '../models/language_level.dart';
 import '../models/lesson.dart';
 import '../models/question.dart';
 
-String cefrForXp(int xp) {
-  if (xp < 100)  return 'A1';
-  if (xp < 300)  return 'A2';
-  if (xp < 700)  return 'B1';
-  if (xp < 1500) return 'B2';
-  return 'C1';
-}
+// Thin alias kept for any legacy call sites.
+String cefrForXp(int xp) => cefrCodeForXp(xp);
 
 class LessonGenerator {
   LessonGenerator({required this.bridge});
@@ -34,10 +30,18 @@ class LessonGenerator {
     required String languageCode,
     required String languageName,
     required int userXp,
+    String? forceSkill,
   }) async {
-    final cefr  = cefrForXp(userXp);
-    final skill = _skills[_skillIndex % _skills.length];
-    _skillIndex++;
+    final cefr = cefrCodeForXp(userXp);
+    final String skill;
+    if (forceSkill != null) {
+      skill = forceSkill;
+    } else {
+      // Offset by day so the daily lesson topic rotates each calendar day.
+      final dayOffset = DateTime.now().difference(DateTime(2025, 1, 1)).inDays;
+      skill = _skills[(dayOffset + _skillIndex) % _skills.length];
+      _skillIndex++;
+    }
 
     final prompt = _buildPrompt(
       languageCode: languageCode,
@@ -49,7 +53,7 @@ class LessonGenerator {
     try {
       final result = await bridge.complete(InferenceRequest(
         prompt:      prompt,
-        maxTokens:   800,
+        maxTokens:   1200,
         temperature: 0.4,
       ));
 
@@ -58,22 +62,16 @@ class LessonGenerator {
         return null;
       }
 
-      return _parse(result.text, languageCode, cefr, skill);
+      return _parse(result.text, languageCode, cefr, skill, userXp);
     } catch (e) {
       debugPrint('[LessonGenerator] error: $e');
       return null;
     }
   }
 
-  String _buildPrompt({
-    required String languageCode,
-    required String languageName,
-    required String cefr,
-    required String skill,
-  }) =>
-      'Generate exactly 4 language learning exercises for a student learning '
-      '$languageName ($languageCode) at CEFR level $cefr. '
-      'Skill focus: $skill. '
+  // Static portion of every lesson prompt — compiled once at class definition,
+  // never reallocated at runtime.
+  static const _promptSuffix =
       'Return ONLY a valid JSON array — no markdown fences, no explanation. '
       'Use this exact schema:\n'
       '[\n'
@@ -84,15 +82,29 @@ class LessonGenerator {
       ']\n'
       'Rules: 3 multiple_choice + 1 word_order. '
       'Correct answer for MC must always be at correct_index. '
-      'shuffled_words for word_order: 3–6 words, correct_order = indices in correct sequence. '
-      'Keep difficulty appropriate for $cefr. '
+      'shuffled_words for word_order: 3–6 words. '
+      'correct_order = INTEGER INDICES (0-based positions in shuffled_words) in the correct sequence. '
+      'Example: shuffled_words:["café","Yo","tomo"] correct_order:[1,2,0] NOT the words themselves. '
       'Vary vocabulary — do not repeat words from previous exercises.';
+
+  String _buildPrompt({
+    required String languageCode,
+    required String languageName,
+    required String cefr,
+    required String skill,
+  }) =>
+      'Generate exactly 4 language learning exercises for a student learning '
+      '$languageName ($languageCode) at CEFR level $cefr. '
+      'Skill focus: $skill. '
+      'Keep difficulty appropriate for $cefr. '
+      '$_promptSuffix';
 
   Lesson? _parse(
     String json,
     String languageCode,
     String cefr,
     String skill,
+    int userXp,
   ) {
     try {
       // Strip any accidental markdown fences
@@ -125,9 +137,17 @@ class LessonGenerator {
           ));
         } else if (type == 'word_order') {
           final words = (q['shuffled_words'] as List).cast<String>();
-          final order = (q['correct_order'] as List)
-              .map((e) => (e as num).toInt())
-              .toList();
+          final rawOrder = q['correct_order'] as List;
+          // Gemini sometimes returns words instead of integer indices — handle both.
+          var order = rawOrder.first is String
+              ? rawOrder.cast<String>().map((w) {
+                  final idx = words.indexOf(w);
+                  return idx >= 0 ? idx : 0;
+                }).toList()
+              : rawOrder.map((e) => (e as num).toInt()).toList();
+          // Guard: filter out any out-of-range indices to prevent RangeError.
+          order = order.where((idx) => idx >= 0 && idx < words.length).toList();
+          if (order.isEmpty) continue;
           questions.add(WordOrderQuestion(
             id:            qId,
             lessonId:      lessonId,
@@ -151,7 +171,7 @@ class LessonGenerator {
         skillTag:         skill,
         questions:        questions,
         estimatedMinutes: 5,
-        xpReward:         _xpFor(cefr),
+        xpReward:         levelForXp(userXp).xpReward,
       );
     } catch (e) {
       debugPrint('[LessonGenerator] parse error: $e\nRaw: $json');
@@ -183,11 +203,5 @@ class LessonGenerator {
     _                            => 'Practise your $lang skills.',
   };
 
-  int _xpFor(String cefr) => switch (cefr) {
-    'A1' => 30,
-    'A2' => 40,
-    'B1' => 55,
-    'B2' => 70,
-    _    => 90,
-  };
+  // XP reward now comes from levelForXp(userXp).xpReward in _parse().
 }

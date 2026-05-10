@@ -23,10 +23,14 @@ class LanguageNotifier extends Notifier<Language> {
 
   void selectLanguage(Language language) {
     final previous = state.code;
+    final now = DateTime.now();
     state = language;
     EventSensor.instance.emit('language_selected', {
       'language_code':  language.code,
+      'language_name':  language.name,
       'previous_code':  previous,
+      'hour_of_day':    now.hour,
+      'day_of_week':    now.weekday,
     });
     _saveToPrefs();
   }

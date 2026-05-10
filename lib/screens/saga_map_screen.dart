@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_theme.dart';
 import '../models/language.dart';
+import '../models/language_level.dart';
 import '../models/puzzle_level.dart';
 import '../providers/language_provider.dart';
 import '../providers/saga_provider.dart';
@@ -16,7 +17,16 @@ class SagaMapScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final saga     = ref.watch(sagaProvider);
     final language = ref.watch(languageProvider);
-    final levels   = kPuzzleLevelsByLanguage[language.code] ?? kPuzzleLevels;
+    final levels   = kPuzzleLevelsByLanguage[language.code];
+    final hasLevels = levels != null;
+
+    // First level that is unlocked but not yet completed = "current".
+    final currentLevelId = hasLevels
+        ? levels.firstWhere(
+            (l) => saga.isUnlocked(l) && !saga.isCompleted(l.id),
+            orElse: () => levels.last,
+          ).id
+        : null;
 
     return Scaffold(
       backgroundColor: FlickColors.background,
@@ -43,7 +53,7 @@ class SagaMapScreen extends ConsumerWidget {
                         size: 14, color: FlickColors.primary),
                     const SizedBox(width: 2),
                     Text(
-                      '${saga.totalXp} XP',
+                      '${saga.xpForLanguage(language.code)} XP',
                       style: Theme.of(context)
                           .textTheme
                           .labelSmall!
@@ -63,43 +73,52 @@ class SagaMapScreen extends ConsumerWidget {
         ),
         children: [
           // Language header
-          _LanguageHeader(language: language),
+          _LanguageHeader(language: language, saga: saga),
 
           const SizedBox(height: FlickSpacing.xl),
 
-          // Reveal powerup info strip
-          if (saga.revealPowerups > 0)
-            _PowerupBanner(count: saga.revealPowerups),
-
-          if (saga.revealPowerups > 0) const SizedBox(height: FlickSpacing.lg),
-
-          // Level nodes with path connectors
-          for (int i = 0; i < levels.length; i++) ...[
-            _LevelNode(
-              level:      levels[i],
-              isUnlocked: saga.isUnlocked(levels[i]),
-              isComplete: saga.isCompleted(levels[i].id),
-              retries:    saga.retriesFor(levels[i].id),
-              index:      i,
-              onTap: saga.isUnlocked(levels[i])
-                  ? () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PuzzleScreen(level: levels[i]),
-                        ),
-                      )
-                  : null,
-            ),
-            if (i < levels.length - 1)
-              _PathConnector(complete: saga.isCompleted(levels[i].id)),
+          // No puzzle content for this language yet
+          if (!hasLevels) ...[
+            _NoContentPlaceholder(languageName: language.name),
+            const SizedBox(height: FlickSpacing.xl),
           ],
 
-          const SizedBox(height: FlickSpacing.xl),
+          if (hasLevels) ...[
+            // Reveal powerup info strip
+            if (saga.revealPowerups > 0)
+              _PowerupBanner(count: saga.revealPowerups),
+
+            if (saga.revealPowerups > 0) const SizedBox(height: FlickSpacing.lg),
+
+            // Level nodes with path connectors
+            for (int i = 0; i < levels.length; i++) ...[
+              _LevelNode(
+                level:      levels[i],
+                isUnlocked: saga.isUnlocked(levels[i]),
+                isComplete: saga.isCompleted(levels[i].id),
+                isCurrent:  levels[i].id == currentLevelId,
+                retries:    saga.retriesFor(levels[i].id),
+                index:      i,
+                onTap: saga.isUnlocked(levels[i])
+                    ? () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PuzzleScreen(level: levels[i]),
+                          ),
+                        )
+                    : null,
+              ),
+              if (i < levels.length - 1)
+                _PathConnector(complete: saga.isCompleted(levels[i].id)),
+            ],
+
+            const SizedBox(height: FlickSpacing.xl),
+          ],
 
           // Grammar lesson gateway — unlocks after 3 puzzle levels
           _LessonGatewayNode(
             unlocked:    saga.completedIds.length >= 3,
-            levelsCount: levels.length,
+            levelsCount: hasLevels ? levels.length : 0,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -119,11 +138,14 @@ class SagaMapScreen extends ConsumerWidget {
 // ---------------------------------------------------------------------------
 
 class _LanguageHeader extends StatelessWidget {
-  const _LanguageHeader({required this.language});
+  const _LanguageHeader({required this.language, required this.saga});
   final Language language;
+  final SagaState saga;
 
   @override
   Widget build(BuildContext context) {
+    final xp    = saga.xpForLanguage(language.code);
+    final level = levelForXp(xp);
     return Row(
       children: [
         Text(language.flag, style: const TextStyle(fontSize: 38)),
@@ -134,7 +156,7 @@ class _LanguageHeader extends StatelessWidget {
             Text(language.name,
                 style: Theme.of(context).textTheme.headlineSmall),
             Text(
-              'Beginner path · A1–A2',
+              '${level.label} · ${level.cefrCode} path',
               style: Theme.of(context)
                   .textTheme
                   .bodyMedium!
@@ -147,6 +169,49 @@ class _LanguageHeader extends StatelessWidget {
         .animate()
         .fadeIn(duration: 400.ms)
         .slideX(begin: -0.08, end: 0, curve: Curves.easeOut);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// No puzzle content placeholder
+// ---------------------------------------------------------------------------
+
+class _NoContentPlaceholder extends StatelessWidget {
+  const _NoContentPlaceholder({required this.languageName});
+  final String languageName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(FlickSpacing.xl),
+      decoration: BoxDecoration(
+        color:        FlickColors.surfaceDim,
+        borderRadius: const BorderRadius.all(FlickRadius.xl),
+        border:       Border.all(color: FlickColors.border),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.construction_rounded,
+              size: 40, color: FlickColors.textMuted),
+          const SizedBox(height: FlickSpacing.md),
+          Text(
+            '$languageName puzzle path coming soon',
+            style: Theme.of(context).textTheme.labelLarge!.copyWith(
+                  color: FlickColors.textSecondary,
+                ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: FlickSpacing.sm),
+          Text(
+            'Use the AI lesson engine below to practise in the meantime.',
+            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                  color: FlickColors.textMuted,
+                ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 400.ms);
   }
 }
 
@@ -200,6 +265,7 @@ class _LevelNode extends StatelessWidget {
     required this.level,
     required this.isUnlocked,
     required this.isComplete,
+    required this.isCurrent,
     required this.retries,
     required this.index,
     required this.onTap,
@@ -208,6 +274,7 @@ class _LevelNode extends StatelessWidget {
   final PuzzleLevel level;
   final bool isUnlocked;
   final bool isComplete;
+  final bool isCurrent;
   final int retries;
   final int index;
   final VoidCallback? onTap;
@@ -230,22 +297,33 @@ class _LevelNode extends StatelessWidget {
                   : FlickColors.surfaceDim,
           borderRadius: const BorderRadius.all(FlickRadius.xl),
           border: Border.all(
-            color: isComplete
-                ? FlickColors.success
-                : isUnlocked
-                    ? FlickColors.border
-                    : FlickColors.border.withOpacity(0.4),
-            width: isComplete ? 2 : 1,
+            color: isCurrent
+                ? FlickColors.primary
+                : isComplete
+                    ? FlickColors.success
+                    : isUnlocked
+                        ? FlickColors.border
+                        : FlickColors.border.withOpacity(0.4),
+            width: isCurrent || isComplete ? 2 : 1,
           ),
-          boxShadow: isUnlocked && !isComplete
+          boxShadow: isCurrent
               ? [
                   BoxShadow(
-                    color:      FlickColors.primary.withOpacity(0.07),
-                    blurRadius: 16,
+                    color:      FlickColors.primary.withOpacity(0.28),
+                    blurRadius: 20,
+                    spreadRadius: 1,
                     offset:     const Offset(0, 4),
                   )
                 ]
-              : null,
+              : isUnlocked && !isComplete
+                  ? [
+                      BoxShadow(
+                        color:      FlickColors.primary.withOpacity(0.07),
+                        blurRadius: 16,
+                        offset:     const Offset(0, 4),
+                      )
+                    ]
+                  : null,
         ),
         child: Row(
           children: [

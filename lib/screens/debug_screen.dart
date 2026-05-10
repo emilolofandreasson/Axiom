@@ -1,9 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flick_sdk/flick_sdk.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme/app_theme.dart';
-import '../services/firebase_sync_service.dart';
+import '../services/supabase_sync_service.dart';
 
 class DebugScreen extends StatefulWidget {
   const DebugScreen({super.key});
@@ -33,30 +33,29 @@ class _DebugScreenState extends State<DebugScreen> {
       _add('Test event emit failed: $e', false);
     }
 
-    // Test 3: Firestore sync
+    // Test 3: Supabase sync
     try {
-      await FirebaseSyncService().sync();
-      _add('Firestore sync triggered', true);
+      await SupabaseSyncService().sync();
+      _add('Supabase event sync triggered', true);
     } catch (e) {
-      _add('Firestore sync failed: $e', false);
+      _add('Supabase sync failed: $e', false);
     }
 
-    // Test 4: Firestore read
+    // Test 4: Supabase read (events table)
     try {
-      final snap = await FirebaseFirestore.instance
-          .collection('events')
-          .orderBy('emitted_at_utc', descending: true)
-          .limit(1)
-          .get();
-      if (snap.docs.isNotEmpty) {
-        final doc  = snap.docs.first;
-        final type = doc.data()['event_type'] ?? 'unknown';
-        _add('Firestore readable — latest event: $type', true);
+      final rows = await Supabase.instance.client
+          .from('events')
+          .select('event_type')
+          .order('created_at', ascending: false)
+          .limit(1);
+      if ((rows as List).isNotEmpty) {
+        final type = rows.first['event_type'] ?? 'unknown';
+        _add('Supabase readable — latest event: $type', true);
       } else {
-        _add('Firestore connected but no events yet', true, warning: true);
+        _add('Supabase connected but no events yet', true, warning: true);
       }
     } catch (e) {
-      _add('Firestore read failed: $e', false);
+      _add('Supabase read failed: $e', false);
     }
 
     // Test 5: SQLite buffer count
@@ -66,6 +65,16 @@ class _DebugScreenState extends State<DebugScreen> {
     } catch (e) {
       _add('SQLite buffer unavailable (web): ok', true, warning: true);
     }
+
+    // Test 6: Supabase auth
+    final user = Supabase.instance.client.auth.currentUser;
+    _add(
+      user != null
+          ? 'Authenticated as ${user.email ?? user.id.substring(0, 8)}'
+          : 'Not signed in',
+      user != null,
+      warning: user == null,
+    );
 
     setState(() => _running = false);
   }
@@ -86,7 +95,7 @@ class _DebugScreenState extends State<DebugScreen> {
           children: [
             Text(
               'Runs a live check of the full data pipeline:\n'
-              'EventSensor → SQLite buffer → Firestore',
+              'EventSensor → SQLite buffer → Supabase',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: FlickSpacing.lg),
@@ -129,8 +138,8 @@ class _DebugScreenState extends State<DebugScreen> {
                     const SizedBox(width: FlickSpacing.sm),
                     Expanded(
                       child: Text(
-                        'All tests passed — check Firebase Console → '
-                        'Firestore → events collection to see your data.',
+                        'All tests passed — check Supabase Table Editor → '
+                        'events to see your data.',
                         style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                               color: FlickColors.success),
                       ),

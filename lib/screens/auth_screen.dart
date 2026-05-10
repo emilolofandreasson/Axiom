@@ -1,12 +1,17 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../core/theme/app_theme.dart';
 import '../services/auth_service.dart';
-import 'home_screen.dart';
 
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key, required this.authService});
+  const AuthScreen({
+    super.key,
+    required this.authService,
+    this.isLogin = true,
+  });
   final AuthService authService;
+  final bool        isLogin;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -15,7 +20,7 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   final _emailCtrl    = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  bool  _isLogin      = true;
+  late bool _isLogin  = widget.isLogin;
   bool  _loading      = false;
   String? _error;
 
@@ -43,12 +48,10 @@ class _AuthScreenState extends State<AuthScreen> {
       } else {
         await widget.authService.createAccount(email, password);
       }
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
-      }
+      // Pop back to AuthGate which handles navigation to MainScreen.
+      if (mounted) Navigator.of(context).pop();
     } catch (e) {
+      debugPrint('[AuthScreen] error: $e');
       setState(() => _error = _friendlyError(e.toString()));
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -56,14 +59,20 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   String _friendlyError(String raw) {
-    if (raw.contains('user-not-found') || raw.contains('wrong-password')) {
+    final lower = raw.toLowerCase();
+    if (lower.contains('invalid login') || lower.contains('invalid credentials')) {
       return 'Incorrect email or password.';
     }
-    if (raw.contains('email-already-in-use')) {
+    if (lower.contains('already registered') || lower.contains('already exists')) {
       return 'An account with this email already exists.';
     }
-    if (raw.contains('weak-password')) return 'Password is too weak.';
-    return 'Something went wrong. Please try again.';
+    if (lower.contains('weak password') || lower.contains('password should')) {
+      return 'Password is too weak (min 6 characters).';
+    }
+    if (lower.contains('email') && lower.contains('valid')) {
+      return 'Please enter a valid email address.';
+    }
+    return 'Error: $raw';
   }
 
   @override

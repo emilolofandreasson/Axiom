@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../core/theme/app_theme.dart';
-import '../models/language.dart';
 import '../models/user_profile.dart';
 import '../services/profile_service.dart';
 

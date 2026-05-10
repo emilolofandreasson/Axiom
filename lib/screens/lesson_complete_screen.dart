@@ -20,10 +20,11 @@ class LessonCompleteScreen extends StatelessWidget {
   final VoidCallback onContinue;
   final List<QuestionResult> wrongAnswers;
 
-  double get _accuracy => correctCount / totalCount;
+  double get _accuracy => totalCount == 0 ? 0.0 : correctCount / totalCount;
+  bool   get _celebrating => _accuracy >= 0.8;
 
   String get _headline {
-    if (_accuracy >= 0.9) return 'Excellent work.';
+    if (_accuracy >= 0.9) return 'Excellent work!';
     if (_accuracy >= 0.7) return 'Good progress.';
     return 'Keep going.';
   }
@@ -81,22 +82,29 @@ class LessonCompleteScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: FlickColors.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(FlickSpacing.xl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Spacer(),
+      body: Stack(
+        children: [
+          // Confetti burst for high scores
+          if (_celebrating)
+            IgnorePointer(
+              child: _ConfettiBurst(),
+            ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(FlickSpacing.xl),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Spacer(),
 
-              // Accuracy ring
-              Center(
-                child: _AccuracyRing(accuracy: _accuracy),
-              ).animate().scale(
-                    begin: const Offset(0.7, 0.7),
-                    duration: 500.ms,
-                    curve: Curves.elasticOut,
-                  ),
+                  // Accuracy ring
+                  Center(
+                    child: _AccuracyRing(accuracy: _accuracy),
+                  ).animate().scale(
+                        begin: const Offset(0.7, 0.7),
+                        duration: 500.ms,
+                        curve: Curves.elasticOut,
+                      ),
 
               const SizedBox(height: FlickSpacing.xxl),
 
@@ -169,6 +177,8 @@ class LessonCompleteScreen extends StatelessWidget {
             ],
           ),
         ),
+          ),
+        ],
       ),
     );
   }
@@ -223,6 +233,40 @@ class _ReviewCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ConfettiBurst extends StatelessWidget {
+  static const _pieces = [
+    ('🎉', Alignment(-0.8, -0.9), 0),
+    ('⭐', Alignment( 0.0, -1.0), 80),
+    ('🎊', Alignment( 0.8, -0.9), 160),
+    ('✨', Alignment(-0.5, -0.7), 240),
+    ('🌟', Alignment( 0.5, -0.7), 320),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.expand(
+      child: Stack(
+        children: _pieces.map((p) {
+          final (emoji, align, delayMs) = p;
+          return Align(
+            alignment: align,
+            child: Text(emoji, style: const TextStyle(fontSize: 36))
+                .animate(autoPlay: true)
+                .fade(begin: 0, end: 1, duration: 300.ms, delay: Duration(milliseconds: delayMs))
+                .scale(begin: const Offset(0.4, 0.4), end: const Offset(1.2, 1.2),
+                       duration: 500.ms, delay: Duration(milliseconds: delayMs),
+                       curve: Curves.elasticOut)
+                .moveY(begin: 30, end: 0, duration: 500.ms,
+                       delay: Duration(milliseconds: delayMs), curve: Curves.easeOut)
+                .then()
+                .fade(begin: 1, end: 0, duration: 400.ms, delay: 1200.ms),
+          );
+        }).toList(),
       ),
     );
   }

@@ -3,15 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../core/theme/app_theme.dart';
 import '../models/language.dart';
+import '../models/language_level.dart';
 import '../models/puzzle_level.dart';
 import '../models/user_profile.dart';
 import '../providers/language_provider.dart';
 import '../providers/saga_provider.dart';
 import '../main.dart' show authService, apiKeyService;
-import '../services/auth_service.dart';
 import '../services/profile_service.dart';
 import 'api_key_screen.dart';
-import 'auth_screen.dart';
 import 'debug_screen.dart';
 import 'edit_profile_screen.dart';
 import 'friends_screen.dart';
@@ -44,20 +43,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final language = ref.watch(languageProvider);
 
     final completedCount = saga.completedIds.length;
-    final totalLevels    = kPuzzleLevelsByLanguage.values
-        .expand((l) => l)
-        .length;
-    final xpMilestone    = ((saga.totalXp / 500).floor() + 1) * 500;
-    final xpProgress     = (saga.totalXp % 500) / 500;
+    final langXp         = saga.xpForLanguage(language.code);
+    final level          = levelForXp(langXp);
+    // progress within the current sub-level (0.0 – 1.0)
+    final xpProgress     = level.isMax
+        ? 1.0
+        : level.progressFraction(langXp).clamp(0.02, 1.0); // min sliver so bar is visible
 
     return Scaffold(
       backgroundColor: FlickColors.background,
       appBar: AppBar(
         title: const Text('Profile'),
         actions: [
-          if (_profile != null)
+          if (authService.currentUser != null)
             TextButton(
-              onPressed: () async {
+              onPressed: _profile == null ? null : () async {
                 final updated = await Navigator.push<UserProfile>(
                   context,
                   MaterialPageRoute(
@@ -101,18 +101,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             Text(
                               _profile?.name.isNotEmpty == true
                                   ? _profile!.name
-                                  : (authService.isAnonymous
-                                      ? 'Guest learner'
-                                      : (authService.currentUser?.email ?? 'Learner')),
+                                  : (authService.currentUser?.email ?? 'Learner'),
                               style: Theme.of(context).textTheme.labelLarge,
                             ),
                             const SizedBox(height: 2),
                             Text(
                               _profile?.bio.isNotEmpty == true
                                   ? _profile!.bio
-                                  : (authService.isAnonymous
-                                      ? 'Sign in to save progress across devices'
-                                      : 'Tap Edit to add a bio'),
+                                  : 'Tap Edit to add a bio',
                               style: Theme.of(context).textTheme.bodyMedium,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -120,17 +116,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ],
                         ),
                       ),
-                      if (authService.isAnonymous)
-                        TextButton(
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  AuthScreen(authService: authService),
-                            ),
-                          ),
-                          child: const Text('Sign in'),
-                        ),
                     ],
                   ),
                   const SizedBox(height: FlickSpacing.md),
@@ -143,7 +128,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           builder: (_) => FriendsScreen(
                               myProfile: _profile ??
                                   UserProfile(
-                                    uid: authService.currentUser?.uid ?? '',
+                                    uid: authService.currentUser?.id ?? '',
                                   )),
                         ),
                       ),
@@ -179,11 +164,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     children: [
                       const Text('⚡', style: TextStyle(fontSize: 18)),
                       const SizedBox(width: FlickSpacing.sm),
-                      Text('${saga.totalXp} XP',
+                      Text('${langXp} XP',
                           style: Theme.of(context).textTheme.labelLarge),
+                      const SizedBox(width: FlickSpacing.sm),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: FlickSpacing.sm,
+                          vertical: FlickSpacing.xs,
+                        ),
+                        decoration: BoxDecoration(
+                          color: FlickColors.primaryDim,
+                          borderRadius: const BorderRadius.all(FlickRadius.full),
+                        ),
+                        child: Text(level.label,
+                            style: Theme.of(context).textTheme.labelSmall!
+                                .copyWith(color: FlickColors.primary)),
+                      ),
                       const Spacer(),
-                      Text('Next: $xpMilestone XP',
-                          style: Theme.of(context).textTheme.bodyMedium),
+                      Flexible(
+                        child: Text(
+                          level.isMax
+                              ? 'Max level 🏆'
+                              : '${level.xpToNextLevel(langXp)} XP to next level',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: FlickSpacing.sm),
@@ -194,8 +201,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     builder: (_, value, __) => LinearProgressIndicator(
                       value:           value,
                       backgroundColor: FlickColors.surfaceDim,
-                      valueColor:
-                          const AlwaysStoppedAnimation(FlickColors.primary),
+                      valueColor: AlwaysStoppedAnimation(
+                          level.isMax ? FlickColors.success : FlickColors.primary),
                       borderRadius:
                           const BorderRadius.all(FlickRadius.full),
                       minHeight: 8,

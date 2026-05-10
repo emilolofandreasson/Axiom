@@ -11,4 +11,12 @@ abstract final class Env {
     'PROXY_URL',
     defaultValue: 'https://proxy-taupe-eight-41.vercel.app',
   );
+
+  // Supabase — project oymlddjcusiyaxtfcvad
+  // Paste the anon/public key from Supabase → Settings → API.
+  static const supabaseUrl     = 'https://oymlddjcusiyaxtfcvad.supabase.co';
+  static const supabaseAnonKey = String.fromEnvironment(
+    'SUPABASE_ANON_KEY',
+    defaultValue: 'sb_publishable_Kq3F2WpG4joClDvAtlYuFA_fYuWUbTj',
+  );
 }

@@ -4,6 +4,7 @@ import 'package:flick_sdk/flick_sdk.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/lesson.dart';
 import '../../models/question.dart';
+import '../../main.dart' show lessonGenerator;
 
 // ---------------------------------------------------------------------------
 // AIChatPanel
@@ -80,11 +81,10 @@ class _AIChatPanelState extends State<AIChatPanel> {
     setState(() => _isTyping = true);
     _scrollToBottom();
 
-    // Phase-2 stub: replace with real edge inference.
-    final reply = await _sendToEdgeAI(
-      userInput: text,
-      context:   widget.question.conversationContext,
-      history:   _messages,
+    final reply = await _sendToAI(
+      userInput:           text,
+      conversationContext: widget.question.conversationContext,
+      history:             _messages,
     );
 
     if (!mounted) return;
@@ -140,7 +140,7 @@ class _AIChatPanelState extends State<AIChatPanel> {
               children: [
                 Text('AI Tutor',
                     style: Theme.of(context).textTheme.labelLarge),
-                Text('Edge AI · on-device',
+                Text('Gemini · AI tutor',
                     style: Theme.of(context)
                         .textTheme
                         .labelSmall!
@@ -180,12 +180,8 @@ class _AIChatPanelState extends State<AIChatPanel> {
                 focusNode:    _focusNode,
                 textInputAction: TextInputAction.send,
                 onSubmitted:  (_) => _send(),
-                decoration: InputDecoration(
-                  hintText:    'Write your answer…',
-                  suffixIcon:  _controller.text.isNotEmpty
-                      ? null
-                      : const Icon(Icons.mic_none_rounded,
-                            color: FlickColors.textMuted, size: 20),
+                decoration: const InputDecoration(
+                  hintText: 'Write your answer…',
                 ),
               ),
             ),
@@ -222,29 +218,40 @@ class _AIChatPanelState extends State<AIChatPanel> {
 }
 
 // ---------------------------------------------------------------------------
-// Stub edge inference — swap for llama.cpp FFI call in Phase 2.
+// Gemini-powered tutor reply
 // ---------------------------------------------------------------------------
-Future<String> _sendToEdgeAI({
+Future<String> _sendToAI({
   required String userInput,
-  required String context,
+  required String conversationContext,
   required List<ChatMessage> history,
 }) async {
-  await Future.delayed(const Duration(milliseconds: 900));
+  try {
+    // Keep only the last 6 messages (3 turns) to bound token usage.
+    final recentHistory = history.length > 6 ? history.sublist(history.length - 6) : history;
+    final historyText = recentHistory
+        .map((m) => '${m.role == ChatRole.assistant ? "Tutor" : "Student"}: ${m.text}')
+        .join('\n');
 
-  final lower = userInput.toLowerCase();
-  if (lower.contains('no sé') || lower.contains('no se') || lower.contains('?')) {
-    return "That's okay! Let's try together. "
-        "Can you tell me one thing you do every morning? "
-        "Start with \"Yo ___\" — for example: \"Yo tomo café.\"";
-  }
-  if (lower.contains('yo ')) {
-    return "¡Muy bien! That's a great sentence. "
-        "Notice the verb form — you've correctly used the first-person present tense. "
-        "Can you try to add when you do this? "
-        "For example: \"Yo tomo café *por la mañana*.\"";
-  }
-  return "Nice try! Remember: in Spanish, the subject pronoun (Yo, Tú, Él) "
-      "often comes before the verb. Give it another shot — you're almost there!";
+    final prompt =
+        'You are a friendly language tutor helping a student practise. '
+        'Keep replies to 1–3 short sentences. Be encouraging, gently correct '
+        'mistakes, and always end with a follow-up question to keep the student '
+        'talking. Use the target language with brief English explanations when '
+        'needed.\n\n'
+        'Context: $conversationContext\n\n'
+        'Conversation so far:\n$historyText\n\n'
+        'Student: $userInput\n\n'
+        'Tutor:';
+
+    final result = await lessonGenerator.bridge.complete(InferenceRequest(
+      prompt:      prompt,
+      maxTokens:   200,
+      temperature: 0.7,
+    ));
+
+    if (result.isSuccess && result.text.isNotEmpty) return result.text.trim();
+  } catch (_) {}
+  return "Great effort! Keep going — you're doing well. Can you try again?";
 }
 
 // ---------------------------------------------------------------------------

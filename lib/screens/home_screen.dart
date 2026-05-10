@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -6,9 +5,12 @@ import '../core/theme/app_theme.dart';
 import '../models/language.dart';
 import '../models/lesson.dart';
 import '../models/puzzle_level.dart';
+import '../models/language_level.dart';
+import '../providers/daily_goal_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/lesson_provider.dart';
 import '../providers/saga_provider.dart';
+import 'ai_practice_screen.dart';
 import 'daily_lesson_screen.dart';
 import 'language_picker_screen.dart';
 import 'saga_map_screen.dart';
@@ -43,9 +45,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Generate an AI lesson as soon as home screen loads.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(lessonProvider.notifier).generateInitialLesson();
+      final s = ref.read(lessonProvider);
+      // Only generate if no AI lesson is already loaded or being generated.
+      if (!s.isGenerating && !s.lesson.isAiGenerated) {
+        ref.read(lessonProvider.notifier).generateInitialLesson();
+      }
     });
   }
 
@@ -54,6 +59,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final language    = ref.watch(languageProvider);
     final lessonState = ref.watch(lessonProvider);
     final sagaState   = ref.watch(sagaProvider);
+    final dailyGoal   = ref.watch(dailyGoalProvider);
     final word        = _wordOfDay(language.code);
     final lessons     = kLessonsByLanguage[language.code] ?? kLessonsByLanguage['es']!;
 
@@ -105,11 +111,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 children: [
                   _StatPill(icon: '🔥', label: '${sagaState.streakCount} day streak'),
                   const SizedBox(width: FlickSpacing.sm),
-                  _StatPill(icon: '⚡', label: '${sagaState.totalXp} XP'),
+                  _StatPill(icon: '⚡', label: '${sagaState.xpForLanguage(language.code)} XP'),
+                  const SizedBox(width: FlickSpacing.sm),
+                  _StatPill(
+                    icon: '🎓',
+                    label: levelLabelForXp(sagaState.xpForLanguage(language.code)),
+                  ),
                 ],
               ).animate().fadeIn(delay: 80.ms, duration: 300.ms),
 
-              const SizedBox(height: FlickSpacing.xl),
+              const SizedBox(height: FlickSpacing.md),
+
+              _DailyGoalBar(goalState: dailyGoal)
+                  .animate().fadeIn(delay: 120.ms, duration: 300.ms),
+
+              const SizedBox(height: FlickSpacing.lg),
 
               _DailyLessonCard(
                 language:    language,
@@ -123,6 +139,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   .animate()
                   .fadeIn(delay: 240.ms, duration: 300.ms),
 
+              const SizedBox(height: FlickSpacing.md),
+
+              _AiPracticeCard()
+                  .animate()
+                  .fadeIn(delay: 300.ms, duration: 300.ms),
+
               if (word != null) ...[
                 const SizedBox(height: FlickSpacing.md),
                 _WordOfDayCard(word: word, language: language)
@@ -134,6 +156,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DailyGoalBar extends StatelessWidget {
+  const _DailyGoalBar({required this.goalState});
+  final DailyGoalState goalState;
+
+  @override
+  Widget build(BuildContext context) {
+    final met = goalState.goalMet;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: FlickSpacing.md,
+        vertical: FlickSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color:        FlickColors.surface,
+        borderRadius: const BorderRadius.all(FlickRadius.md),
+        border:       Border.all(color: FlickColors.border),
+      ),
+      child: Row(
+        children: [
+          Text(met ? '🎯' : '📅', style: const TextStyle(fontSize: 14)),
+          const SizedBox(width: FlickSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      met ? 'Daily goal reached!' : 'Daily goal',
+                      style: Theme.of(context).textTheme.labelMedium!.copyWith(
+                            color: met ? FlickColors.success : FlickColors.textPrimary,
+                          ),
+                    ),
+                    Text(
+                      '${goalState.xpToday} / $kDailyXpGoal XP',
+                      style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                            color: FlickColors.textMuted),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                ClipRRect(
+                  borderRadius: const BorderRadius.all(FlickRadius.full),
+                  child: LinearProgressIndicator(
+                    value:           goalState.progress,
+                    backgroundColor: FlickColors.surfaceDim,
+                    valueColor:      AlwaysStoppedAnimation(
+                        met ? FlickColors.success : FlickColors.primary),
+                    minHeight:       4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -431,7 +514,7 @@ class _MiniChip extends StatelessWidget {
 }
 
 class _PuzzlePathCard extends StatelessWidget {
-  const _PuzzlePathCard({super.key});
+  const _PuzzlePathCard();
 
   @override
   Widget build(BuildContext context) {
@@ -463,6 +546,88 @@ class _PuzzlePathCard extends StatelessWidget {
               ),
             ),
             const Icon(Icons.arrow_forward_rounded, color: FlickColors.textMuted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AiPracticeCard extends StatelessWidget {
+  const _AiPracticeCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const AiPracticeScreen()),
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(FlickSpacing.lg),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              FlickColors.primary.withValues(alpha: 0.12),
+              FlickColors.primaryDim,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: const BorderRadius.all(FlickRadius.lg),
+          border: Border.all(
+              color: FlickColors.primary.withValues(alpha: 0.3), width: 1.5),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                color:        FlickColors.primary,
+                borderRadius: const BorderRadius.all(FlickRadius.md),
+              ),
+              child: const Icon(Icons.auto_awesome_rounded,
+                  color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: FlickSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text('AI Practice',
+                          style: Theme.of(context).textTheme.headlineSmall),
+                      const SizedBox(width: FlickSpacing.xs),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: FlickColors.primary,
+                          borderRadius:
+                              const BorderRadius.all(FlickRadius.full),
+                        ),
+                        child: Text('NEW',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall!
+                                .copyWith(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    letterSpacing: 0.5)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text('Pick a topic, get 4 AI exercises instantly',
+                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                            color: FlickColors.textSecondary)),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_rounded,
+                color: FlickColors.primary),
           ],
         ),
       ),

@@ -4,6 +4,8 @@ import '../models/lesson.dart';
 import '../models/question.dart';
 import 'language_provider.dart';
 import 'saga_provider.dart';
+import 'daily_goal_provider.dart';
+import 'hearts_provider.dart';
 import '../main.dart' show lessonGenerator;
 
 // ---------------------------------------------------------------------------
@@ -52,7 +54,8 @@ class LessonState {
   Question get currentQuestion => lesson.questions[currentIndex];
   bool get isLastQuestion => currentIndex >= lesson.questions.length - 1;
   int get totalQuestions => lesson.questions.length;
-  double get progressFraction => currentIndex / totalQuestions;
+  double get progressFraction =>
+      totalQuestions == 0 ? 0.0 : (currentIndex + 1) / totalQuestions;
 
   int get correctCount =>
       results.where((r) => r.answerState == AnswerState.correct).length;
@@ -90,13 +93,15 @@ class LessonState {
 
 class LessonNotifier extends Notifier<LessonState> {
   DateTime? _lessonStartedAt;
-  bool _generating = false;
 
   @override
   LessonState build() {
     final language = ref.watch(languageProvider);
-    final lessons  = kLessonsByLanguage[language.code] ?? kLessonsByLanguage['es']!;
-    return LessonState(lesson: lessons[0], lessonIndex: 0, status: LessonStatus.idle);
+    // Use seed lessons for this language if available, else Spanish seeds as
+    // emergency fallback. For AI-only languages the initial lesson is replaced
+    // by generateInitialLesson() immediately after the first frame.
+    final seeds = kLessonsByLanguage[language.code] ?? kLessonsByLanguage['es']!;
+    return LessonState(lesson: seeds[0], lessonIndex: 0, status: LessonStatus.idle);
   }
 
   void startLesson() {
@@ -108,11 +113,16 @@ class LessonNotifier extends Notifier<LessonState> {
       questionStartedAt: DateTime.now(),
     );
 
+    final now = DateTime.now();
     EventSensor.instance.emit('lesson_started', {
-      'lesson_id':      state.lesson.id,
-      'cefr_level':     state.lesson.cefrLevel,
-      'skill_tag':      state.lesson.skillTag,
-      'question_count': state.totalQuestions,
+      'lesson_id':       state.lesson.id,
+      'cefr_level':      state.lesson.cefrLevel,
+      'skill_tag':       state.lesson.skillTag,
+      'skill_category':  state.lesson.skillTag.split('/').first, // 'vocabulary' | 'grammar' | 'conversation'
+      'question_count':  state.totalQuestions,
+      'hour_of_day':     now.hour,
+      'day_of_week':     now.weekday,
+      'course_language': state.lesson.courseLanguage,
     });
   }
 
@@ -125,7 +135,7 @@ class LessonNotifier extends Notifier<LessonState> {
     final generated = await lessonGenerator.generate(
       languageCode: language.code,
       languageName: language.name,
-      userXp:       saga.totalXp,
+      userXp:       saga.xpForLanguage(language.code),
     );
 
     if (generated != null) {
@@ -137,22 +147,31 @@ class LessonNotifier extends Notifier<LessonState> {
         lastGenerationFailed: false,
       );
     } else {
-      final lessons = kLessonsByLanguage[language.code] ?? kLessonsByLanguage['es']!;
-      // If only 1 seed lesson exists, don't loop — show a fresh seed copy
-      // with a unique id so the UI reflects a "new" lesson.
-      final nextIndex = lessons.length > 1
-          ? (state.lessonIndex + 1) % lessons.length
-          : 0;
-      final nextLesson = lessons[nextIndex];
-      state = state.copyWith(
-        lesson:               nextLesson,
-        lessonIndex:          state.lessonIndex + 1,
-        status:               LessonStatus.idle,
-        isGenerating:         false,
-        lastGenerationFailed: true,
-      );
+      // AI failed — fall back to seed lessons for this language.
+      // For languages without seed content, keep the current lesson so the
+      // user sees a retry prompt rather than wrong-language content.
+      final seeds = kLessonsByLanguage[language.code];
+      if (seeds != null) {
+        final nextIndex = seeds.length > 1
+            ? (state.lessonIndex + 1) % seeds.length
+            : 0;
+        state = state.copyWith(
+          lesson:               seeds[nextIndex],
+          lessonIndex:          state.lessonIndex + 1,
+          status:               LessonStatus.idle,
+          isGenerating:         false,
+          lastGenerationFailed: true,
+        );
+      } else {
+        // No seeds for this language — stay on current lesson, flag failed.
+        state = state.copyWith(
+          isGenerating:         false,
+          lastGenerationFailed: true,
+          status:               LessonStatus.idle,
+        );
+      }
     }
-    startLesson();
+    // Lesson intro screen drives startLesson() explicitly via "Begin" button.
   }
 
   Future<void> generateInitialLesson() async {
@@ -164,7 +183,7 @@ class LessonNotifier extends Notifier<LessonState> {
     final generated = await lessonGenerator.generate(
       languageCode: language.code,
       languageName: language.name,
-      userXp:       saga.totalXp,
+      userXp:       saga.xpForLanguage(language.code),
     );
 
     if (generated != null) {
@@ -211,6 +230,14 @@ class LessonNotifier extends Notifier<LessonState> {
       results: [...state.results, result],
     );
 
+    if (!isCorrect) {
+      ref.read(heartsProvider.notifier).loseHeart();
+      // If hearts are now empty, end the lesson.
+      if (ref.read(heartsProvider).isEmpty) {
+        state = state.copyWith(status: LessonStatus.outOfHearts);
+      }
+    }
+
     EventSensor.instance.emit('answer_submitted', {
       'lesson_id':     state.lesson.id,
       'question_id':   q.id,
@@ -220,6 +247,23 @@ class LessonNotifier extends Notifier<LessonState> {
       'time_taken_ms': elapsed,
       'cefr_level':    q.cefrLevel,
     });
+  }
+
+  void abandonLesson() {
+    if (state.status != LessonStatus.inProgress) return;
+    final elapsed = _lessonStartedAt != null
+        ? DateTime.now().difference(_lessonStartedAt!).inSeconds
+        : 0;
+    EventSensor.instance.emit('lesson_abandoned', {
+      'lesson_id':       state.lesson.id,
+      'course_language': state.lesson.courseLanguage,
+      'cefr_level':      state.lesson.cefrLevel,
+      'skill_tag':       state.lesson.skillTag,
+      'progress_pct':    state.progressFraction,
+      'question_index':  state.currentIndex,
+      'time_seconds':    elapsed,
+    });
+    state = state.copyWith(status: LessonStatus.abandoned);
   }
 
   void advance() {
@@ -238,16 +282,30 @@ class LessonNotifier extends Notifier<LessonState> {
   void _completeLesson() {
     state = state.copyWith(status: LessonStatus.completed);
 
+    final xp = state.lesson.xpReward;
+
+    // Award XP to saga (persists to Firestore) and daily goal.
+    ref.read(sagaProvider.notifier).awardLessonXp(
+          xp, languageCode: state.lesson.courseLanguage);
+    ref.read(dailyGoalProvider.notifier).addXp(xp);
+
+    // Refill hearts on lesson complete (reward for finishing).
+    if (state.accuracy >= 0.8) {
+      ref.read(heartsProvider.notifier).refillAll();
+    }
+
     EventSensor.instance.emit('lesson_completed', {
-      'lesson_id':       state.lesson.id,
-      'course_language': state.lesson.courseLanguage,
-      'cefr_level':      state.lesson.cefrLevel,
-      'skill_tag':       state.lesson.skillTag,
-      'exercise_count':  state.totalQuestions,
-      'correct_count':   state.correctCount,
-      'accuracy_pct':    state.accuracy,
-      'duration_seconds': _lessonStartedAt != null ? DateTime.now().difference(_lessonStartedAt!).inSeconds : 0,
-      'xp_earned':       state.lesson.xpReward,
+      'lesson_id':        state.lesson.id,
+      'course_language':  state.lesson.courseLanguage,
+      'cefr_level':       state.lesson.cefrLevel,
+      'skill_tag':        state.lesson.skillTag,
+      'exercise_count':   state.totalQuestions,
+      'correct_count':    state.correctCount,
+      'accuracy_pct':     state.accuracy,
+      'duration_seconds': _lessonStartedAt != null
+          ? DateTime.now().difference(_lessonStartedAt!).inSeconds
+          : 0,
+      'xp_earned':        xp,
     });
   }
 

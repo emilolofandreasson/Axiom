@@ -1,7 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flick_sdk/flick_sdk.dart';
 import '../config/env.dart';
 import '../main.dart' show lessonGenerator;
@@ -11,16 +10,17 @@ class ApiKeyService {
   static const _storage = FlutterSecureStorage();
   static const _kKey    = 'gemini_api_key';
 
+  SupabaseClient get _db => Supabase.instance.client;
+  String? get _uid      => _db.auth.currentUser?.id;
+
   Future<String?> loadKey() => _storage.read(key: _kKey);
 
   Future<bool> saveKey(String key) async {
     final trimmed = key.trim();
-    if (trimmed.isEmpty) return false;
-
-    if (!_verify(trimmed)) return false;
+    if (trimmed.isEmpty || !_verify(trimmed)) return false;
 
     await _storage.write(key: _kKey, value: trimmed);
-    await _syncToFirestore(trimmed);
+    await _syncToSupabase(trimmed);
     _applyToGenerator(trimmed);
     return true;
   }
@@ -37,55 +37,57 @@ class ApiKeyService {
     }
   }
 
-  Future<void> syncFromFirestore() async {
+  Future<void> syncFromSupabase() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null || user.isAnonymous) return;
+      final uid = _uid;
+      if (uid == null) return;
 
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
+      final row = await _db
+          .from('users')
+          .select('gemini_key')
+          .eq('id', uid)
+          .maybeSingle();
 
-      final key = doc.data()?['gemini_key'] as String?;
+      final key = row?['gemini_key'] as String?;
       if (key != null && key.isNotEmpty) {
         await _storage.write(key: _kKey, value: key);
         _applyToGenerator(key);
-        debugPrint('[ApiKeyService] loaded key from Firestore');
+        debugPrint('[ApiKeyService] loaded key from Supabase');
       }
     } catch (e) {
-      debugPrint('[ApiKeyService] Firestore sync failed: $e');
+      debugPrint('[ApiKeyService] Supabase sync failed: $e');
     }
   }
 
-  bool _verify(String key) {
-    // Gemini API keys: start with "AIzaSy", 39 chars total.
-    // Full live-verification causes CORS issues on web; the key is
-    // validated for real on the first lesson generation.
-    return key.startsWith('AIzaSy') && key.length >= 35;
-  }
+  bool _verify(String key) =>
+      key.startsWith('AIzaSy') && key.length >= 35;
 
-  Future<void> _syncToFirestore(String key) async {
+  Future<void> _syncToSupabase(String key) async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null || user.isAnonymous) return;
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .set({'gemini_key': key}, SetOptions(merge: true));
+      final uid = _uid;
+      if (uid == null) return;
+      await _db
+          .from('users')
+          .update({'gemini_key': key})
+          .eq('id', uid);
     } catch (e) {
-      debugPrint('[ApiKeyService] Firestore write failed: $e');
+      debugPrint('[ApiKeyService] Supabase write failed: $e');
     }
   }
 
   void _applyToGenerator(String? key) {
     final proxyUrl = Env.proxyUrl.isNotEmpty ? Env.proxyUrl : null;
-    final bridge   = (key != null && key.isNotEmpty)
-        ? GeminiBridge(apiKey: key, proxyUrl: proxyUrl)
-        : StubEdgeAiBridge();
+    final EdgeAiBridge bridge;
+    if (key != null && key.isNotEmpty) {
+      bridge = GeminiBridge(apiKey: key, proxyUrl: proxyUrl);
+    } else if (proxyUrl != null) {
+      bridge = GeminiBridge(apiKey: '', proxyUrl: proxyUrl);
+    } else {
+      bridge = StubEdgeAiBridge();
+    }
     bridge.loadModel('');
     lessonGenerator = LessonGenerator(bridge: bridge);
     debugPrint('[ApiKeyService] generator updated — '
-        '${key != null ? "GeminiBridge" : "StubBridge"}');
+        '${bridge is GeminiBridge ? "GeminiBridge(${key?.isNotEmpty == true ? "user-key" : "server-key"})" : "StubBridge"}');
   }
 }

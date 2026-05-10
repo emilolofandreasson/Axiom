@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme/app_theme.dart';
+import '../services/data_export_service.dart';
 
 const String _kPolicyVersion = '1.0';
 
@@ -216,12 +217,99 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                               color: FlickColors.textMuted,
                             ),
                       ),
-                      const SizedBox(height: FlickSpacing.xl),
+                      const SizedBox(height: FlickSpacing.xl * 2),
                     ]),
+                  ),
+                ),
+
+                // Data Export Section (GDPR Article 20)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: FlickSpacing.lg),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Download your data',
+                          style: Theme.of(context).textTheme.displaySmall,
+                        ),
+                        const SizedBox(height: FlickSpacing.sm),
+                        Text(
+                          'Export all your data including profile, learning history, and settings as JSON.',
+                          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                                color: FlickColors.textSecondary,
+                                height: 1.6,
+                              ),
+                        ),
+                        const SizedBox(height: FlickSpacing.lg),
+                        _ExportButton(),
+                        const SizedBox(height: FlickSpacing.xl),
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
+    );
+  }
+}
+
+class _ExportButton extends StatefulWidget {
+  const _ExportButton();
+
+  @override
+  State<_ExportButton> createState() => _ExportButtonState();
+}
+
+class _ExportButtonState extends State<_ExportButton> {
+  bool _loading = false;
+
+  Future<void> _handleExport() async {
+    setState(() => _loading = true);
+
+    try {
+      final filePath = await DataExportService().exportUserData();
+
+      if (!mounted) return;
+
+      if (filePath != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Data exported: $filePath'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Export failed')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: _loading ? null : _handleExport,
+        icon: _loading
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
+            : const Icon(Icons.download_rounded),
+        label: Text(_loading ? 'Exporting…' : 'Export my data'),
+      ),
     );
   }
 }

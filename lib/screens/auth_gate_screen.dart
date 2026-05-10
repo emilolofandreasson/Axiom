@@ -89,14 +89,13 @@ class AuthGateScreen extends StatelessWidget {
                           ),
                         ),
                       );
-                      if (context.mounted && authService.currentUser != null) {
-                        final prefs = await SharedPreferences.getInstance();
-                        final done  = prefs.getBool('onboarding_complete') ?? false;
-                        if (!context.mounted) return;
+                      // After signup, always navigate to onboarding regardless of currentUser state
+                      // because new users must see GDPR consent screen before using the app
+                      if (context.mounted) {
                         Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => done ? const MainScreen() : const OnboardingScreen(),
+                            builder: (_) => const OnboardingScreen(),
                           ),
                         );
                       }

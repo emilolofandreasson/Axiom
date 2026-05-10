@@ -14,6 +14,7 @@ import 'api_key_screen.dart';
 import 'debug_screen.dart';
 import 'edit_profile_screen.dart';
 import 'friends_screen.dart';
+import 'privacy_settings_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -286,6 +287,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             _AiKeyCard().animate().fadeIn(delay: 400.ms),
 
             const SizedBox(height: FlickSpacing.lg),
+
+            // Privacy Settings button
+            OutlinedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PrivacySettingsScreen()),
+              ),
+              icon: const Icon(Icons.shield_rounded, size: 18),
+              label: const Text('Privacy & Data Settings'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: FlickColors.primary,
+                side: const BorderSide(color: FlickColors.primary),
+              ),
+            ).animate().fadeIn(delay: 400.ms),
+
+            const SizedBox(height: FlickSpacing.md),
 
             // Database test button
             OutlinedButton.icon(

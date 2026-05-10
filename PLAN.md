@@ -5,7 +5,7 @@
 
 ## Nulägesbedömning
 
-Axiom är en välstrukturerad pre-alpha med fungerande kärnloop: onboarding → AI-genererade lektioner → per-språk XP (10 nivåer) → streak → puzzle-karta. Firebase, Firestore, Vercel-proxyn och Gemini 2.5 Flash-pipeline är på plats. Största problemen: hearts-mekaniken är byggd men inte påtvingad i spelet, AI-chatten är en hårdkodad stub, XP delas inte ut i AI Practice, och en rad kritiska buggar gör upplevelsen opålitlig vid kant-fall.
+Axiom är en välstrukturerad pre-alpha med fungerande kärnloop: onboarding → AI-genererade lektioner → per-språk XP (10 nivåer) → streak → puzzle-karta. Supabase (Auth + PostgreSQL), Vercel-proxyn och Gemini 2.5 Flash-pipeline är på plats. Största problemen: hearts-mekaniken är byggd men inte påtvingad i spelet, AI-chatten är en hårdkodad stub, XP delas inte ut i AI Practice, och en rad kritiska buggar gör upplevelsen opålitlig vid kant-fall.
 
 ---
 
@@ -65,7 +65,7 @@ Axiom är en välstrukturerad pre-alpha med fungerande kärnloop: onboarding →
 - Skicka exakt awarded XP i analytics-eventet
 
 ### 2.5 17 språk med saknat puzzle-innehåll
-- Alternativ A: Generera puzzle-nivåer via Gemini första gången ett språk väljs, spara i Firestore
+- Alternativ A: Generera puzzle-nivåer via Gemini första gången ett språk väljs, spara i Supabase
 - Alternativ B (snabb): Märk oinnehållsrika språk som "Coming soon" på puzzle-kartan men håll lektion/AI Practice aktiva (de fungerar redan via AI)
 
 ---
@@ -108,7 +108,7 @@ Axiom är en välstrukturerad pre-alpha med fungerande kärnloop: onboarding →
 ## FAS 4 — Tillväxtfeatures (efter stabil grund)
 
 ### 4.1 Retention (högst impact)
-1. **Push-notifikationer** — "Din 5-dagars streak är i fara!" via Firebase Cloud Messaging
+1. **Push-notifikationer** — "Din 5-dagars streak är i fara!" via Supabase Realtime + Edge Functions
 2. **Streak Shield** — skyddsmekanik för missade dagar, köps/tjänas som reward
 3. **Spaced Repetition** — fel svar från `wrongAnswers` sparas och återkommer som "Review"-läge
 4. **Dagligt mål konfigurerbart** — användaren väljer 10/20/50 XP, inte hårdkodat 20
@@ -131,11 +131,11 @@ Axiom är en välstrukturerad pre-alpha med fungerande kärnloop: onboarding →
 |-------|----------|-----|
 | `lessonGenerator` är global mutable — omöjlig att testa | Hög | Gör till Riverpod-provider |
 | `unawaited()` är en hand-rullad no-op | Medium | Importera `dart:async show unawaited` |
-| `FirebaseSyncService` syncas bara vid cold start | Medium | `Timer.periodic(5 min)` eller lifecycle-trigger |
-| `SagaNotifier` anropar Firebase direkt — otestbar | Medium | Extrahera `SagaRepository`-abstraktion |
-| Gemini API-nyckel lagras i klartext i Firestore | Medium | Ta bort Firestore-lagring, device-only via secure storage |
-| Proxy saknar autentisering — vem som helst kan anropa | Hög | Lägg till HMAC-token eller Firebase ID token check |
-| `kPuzzleLevelsByLanguage` är compile-time konstant | Låg | Flytta till Firestore för OTA-uppdateringar |
+| `SupabaseSyncService` syncas bara vid cold start | Medium | `Timer.periodic(5 min)` eller lifecycle-trigger |
+| `SagaNotifier` anropar Supabase direkt — otestbar | Medium | Extrahera `SagaRepository`-abstraktion |
+| Gemini API-nyckel lagras i klartext i Supabase | Medium | Ta bort databas-lagring, device-only via secure storage |
+| Proxy saknar autentisering — vem som helst kan anropa | Hög | Lägg till HMAC-token eller Supabase JWT-check |
+| `kPuzzleLevelsByLanguage` är compile-time konstant | Låg | Flytta till Supabase för OTA-uppdateringar |
 | `SagaNotifier` → `AsyncNotifier<SagaState>` | Medium | Representera loading-state korrekt för UI |
 
 ---

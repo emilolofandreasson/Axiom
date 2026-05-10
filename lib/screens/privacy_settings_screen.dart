@@ -367,7 +367,7 @@ class _ConsentToggle extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChange,
-            activeColor: FlickColors.primary,
+            activeThumbColor: FlickColors.primary,
             inactiveThumbColor: FlickColors.textMuted,
             inactiveTrackColor: FlickColors.surfaceDim,
           ),

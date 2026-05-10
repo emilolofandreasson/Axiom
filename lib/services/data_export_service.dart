@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -33,22 +32,23 @@ class DataExportService {
       debugPrint('[DataExport] Starting export for user $uid');
 
       // Call edge function
-      final response = await _db.functions.invoke(
-        'data-export',
-        options: FunctionInvokeOptions(
-          headers: {
-            'Authorization': 'Bearer ${_db.auth.currentSession?.accessToken}',
-          },
-        ),
-      );
+      dynamic response = await _db.functions.invoke('data-export');
 
       if (response == null) {
         debugPrint('[DataExport] Export returned null');
         return null;
       }
 
-      // Convert response to JSON if it's a string
-      final Map<String, dynamic> exportData = response is String ? jsonDecode(response) : response;
+      // FunctionResponse returns the data directly as Map or String
+      final Map<String, dynamic> exportData;
+      if (response is Map) {
+        exportData = response.cast<String, dynamic>();
+      } else if (response is String) {
+        exportData = jsonDecode(response) as Map<String, dynamic>;
+      } else {
+        debugPrint('[DataExport] Unexpected response type: ${response.runtimeType}');
+        return null;
+      }
 
       // Save to file
       final filename = 'axiom-export-${uid.substring(0, 8)}-${DateTime.now().millisecondsSinceEpoch}.json';
@@ -64,16 +64,8 @@ class DataExportService {
 
   /// Save export data to file system
   Future<File> _saveToFile(String filename, String jsonData) async {
-    late Directory dir;
-
-    if (defaultTargetPlatform == TargetPlatform.android ||
-        defaultTargetPlatform == TargetPlatform.iOS) {
-      dir = (await getApplicationDocumentsDirectory());
-    } else {
-      // Web/Desktop
-      dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
-    }
-
+    // Get documents directory (most portable across platforms)
+    final dir = await getApplicationDocumentsDirectory();
     final file = File('${dir.path}/$filename');
     await file.writeAsString(jsonData);
     return file;
@@ -85,18 +77,18 @@ class DataExportService {
       final uid = _db.auth.currentUser?.id;
       if (uid == null) return null;
 
-      final response = await _db.functions.invoke(
-        'data-export',
-        options: FunctionInvokeOptions(
-          headers: {
-            'Authorization': 'Bearer ${_db.auth.currentSession?.accessToken}',
-          },
-        ),
-      );
+      dynamic response = await _db.functions.invoke('data-export');
 
       if (response == null) return null;
 
-      final Map<String, dynamic> data = response is String ? jsonDecode(response) : response;
+      final Map<String, dynamic> data;
+      if (response is Map) {
+        data = response.cast<String, dynamic>();
+      } else if (response is String) {
+        data = jsonDecode(response) as Map<String, dynamic>;
+      } else {
+        return null;
+      }
 
       return {
         'exportedAt': data['exportedAt'],

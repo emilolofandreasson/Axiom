@@ -132,7 +132,7 @@ Axiom är gratis för användaren. Betalningen är data. Användaren informeras 
 
 ### Ansvar
 - **Samtyckehantering:** Designa och underhålla consent-flödet (onboarding + inställningar). Samtycke måste vara granulerat, återkallbart och loggat med tidsstämpel i Supabase.
-- **Datapunktsdesign:** Definiera vilka signaler som är värdefulla för B2B-partners (reseföretag, språkskolor, turismorganisationer) och säkerställa att EventSensor fångar dem korrekt.
+- **Datapunktsdesign:** Definiera vilka signaler som är värdefulla för B2B-partners (reseföretag, språkskolor, turismorganisationer, etc) och säkerställa att EventSensor fångar dem korrekt.
 - **GDPR-efterlevnad:** Implementera och underhålla rättigheterna rätt till tillgång, rättelse, radering (§17), dataportabilitet (§20) och invändning (§21). Hålla integritetspolicyn aktuell.
 - **Master Data Management:** Äga Supabase-schemats `users`-tabell och `consent_log`-tabell. Säkerställa datakvalitet, konsistens och att inga orphaned records uppstår.
 - **Dataprodukt för partners:** Designa aggregerade, anonymiserade dataprodukter som kan säljas. Aldrig sälja råa personuppgifter — alltid aggregerat eller pseudonymiserat med k-anonymitet ≥ 10.

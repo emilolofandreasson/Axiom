@@ -1,5 +1,23 @@
-import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// Test result data structure
+class RLSTestResult {
+  final String name;
+  final bool passed;
+  final String? error;
+  final String? details;
+
+  RLSTestResult({
+    required this.name,
+    required this.passed,
+    this.error,
+    this.details,
+  });
+
+  @override
+  String toString() =>
+      '${passed ? '✅' : '❌'} $name${details != null ? ' — $details' : ''}${error != null ? '\n   Error: $error' : ''}';
+}
 
 /// RLS Security Test Service — validates that Row Level Security policies are working
 class RLSTestService {
@@ -10,28 +28,9 @@ class RLSTestService {
 
   SupabaseClient get _db => Supabase.instance.client;
 
-  /// Test results
-  class TestResult {
-    final String name;
-    final bool passed;
-    final String? error;
-    final String? details;
-
-    TestResult({
-      required this.name,
-      required this.passed,
-      this.error,
-      this.details,
-    });
-
-    @override
-    String toString() =>
-        '${passed ? '✅' : '❌'} $name${details != null ? ' — $details' : ''}${error != null ? '\n   Error: $error' : ''}';
-  }
-
   /// Run all RLS tests
-  Future<List<TestResult>> runAllTests() async {
-    final results = <TestResult>[];
+  Future<List<RLSTestResult>> runAllTests() async {
+    final results = <RLSTestResult>[];
 
     // Test 1: User can read own profile
     results.add(await _testOwnProfileRead());
@@ -60,11 +59,11 @@ class RLSTestService {
     return results;
   }
 
-  Future<TestResult> _testOwnProfileRead() async {
+  Future<RLSTestResult> _testOwnProfileRead() async {
     try {
       final uid = _db.auth.currentUser?.id;
       if (uid == null) {
-        return TestResult(
+        return RLSTestResult(
           name: 'Own profile read',
           passed: false,
           error: 'Not authenticated',
@@ -72,13 +71,13 @@ class RLSTestService {
       }
 
       final row = await _db.from('users').select().eq('id', uid).maybeSingle();
-      return TestResult(
+      return RLSTestResult(
         name: 'Own profile read',
         passed: row != null,
         details: row != null ? 'Loaded ${row['name'] ?? 'unnamed'} profile' : null,
       );
     } catch (e) {
-      return TestResult(
+      return RLSTestResult(
         name: 'Own profile read',
         passed: false,
         error: e.toString(),
@@ -86,11 +85,11 @@ class RLSTestService {
     }
   }
 
-  Future<TestResult> _testOwnProfileUpdate() async {
+  Future<RLSTestResult> _testOwnProfileUpdate() async {
     try {
       final uid = _db.auth.currentUser?.id;
       if (uid == null) {
-        return TestResult(
+        return RLSTestResult(
           name: 'Own profile update',
           passed: false,
           error: 'Not authenticated',
@@ -107,13 +106,13 @@ class RLSTestService {
       // Clean up
       await _db.from('users').update({'bio': null}).eq('id', uid);
 
-      return TestResult(
+      return RLSTestResult(
         name: 'Own profile update',
         passed: success,
         details: success ? 'Update successful' : 'Update failed to persist',
       );
     } catch (e) {
-      return TestResult(
+      return RLSTestResult(
         name: 'Own profile update',
         passed: false,
         error: e.toString(),
@@ -121,11 +120,11 @@ class RLSTestService {
     }
   }
 
-  Future<TestResult> _testCrossUserProfileBlocked() async {
+  Future<RLSTestResult> _testCrossUserProfileBlocked() async {
     try {
       final uid = _db.auth.currentUser?.id;
       if (uid == null) {
-        return TestResult(
+        return RLSTestResult(
           name: 'Cross-user profile blocked',
           passed: false,
           error: 'Not authenticated',
@@ -137,7 +136,7 @@ class RLSTestService {
       final rows = await _db.from('users').select().neq('id', uid).limit(1);
 
       // If we got results, RLS is NOT working (FAIL)
-      return TestResult(
+      return RLSTestResult(
         name: 'Cross-user profile blocked',
         passed: (rows as List).isEmpty,
         details:
@@ -146,13 +145,13 @@ class RLSTestService {
     } catch (e) {
       // Expected to fail — RLS should throw
       if (e.toString().contains('policy') || e.toString().contains('POLICY')) {
-        return TestResult(
+        return RLSTestResult(
           name: 'Cross-user profile blocked',
           passed: true,
           details: 'RLS correctly rejected cross-user query',
         );
       }
-      return TestResult(
+      return RLSTestResult(
         name: 'Cross-user profile blocked',
         passed: false,
         error: 'Unexpected error: $e',
@@ -160,11 +159,11 @@ class RLSTestService {
     }
   }
 
-  Future<TestResult> _testInsertOwnEvent() async {
+  Future<RLSTestResult> _testInsertOwnEvent() async {
     try {
       final uid = _db.auth.currentUser?.id;
       if (uid == null) {
-        return TestResult(
+        return RLSTestResult(
           name: 'Insert own event',
           passed: false,
           error: 'Not authenticated',
@@ -179,13 +178,13 @@ class RLSTestService {
         'payload': {'test': true},
       });
 
-      return TestResult(
+      return RLSTestResult(
         name: 'Insert own event',
         passed: true,
         details: 'Event inserted (RLS allows)',
       );
     } catch (e) {
-      return TestResult(
+      return RLSTestResult(
         name: 'Insert own event',
         passed: false,
         error: e.toString(),
@@ -193,13 +192,13 @@ class RLSTestService {
     }
   }
 
-  Future<TestResult> _testEventsReadBlocked() async {
+  Future<RLSTestResult> _testEventsReadBlocked() async {
     try {
       // Try to read events — RLS should block SELECT
       final rows = await _db.from('events').select().limit(1);
 
       // If we got results, RLS is NOT working
-      return TestResult(
+      return RLSTestResult(
         name: 'Events SELECT blocked',
         passed: (rows as List).isEmpty,
         details: (rows as List).isEmpty ? 'RLS blocking SELECT ✓' : 'Got events (RLS not enforced)',
@@ -207,13 +206,13 @@ class RLSTestService {
     } catch (e) {
       // Expected — RLS should reject SELECT
       if (e.toString().contains('policy') || e.toString().contains('POLICY')) {
-        return TestResult(
+        return RLSTestResult(
           name: 'Events SELECT blocked',
           passed: true,
           details: 'RLS correctly rejected SELECT',
         );
       }
-      return TestResult(
+      return RLSTestResult(
         name: 'Events SELECT blocked',
         passed: false,
         error: 'Unexpected error: $e',
@@ -221,11 +220,11 @@ class RLSTestService {
     }
   }
 
-  Future<TestResult> _testOwnConsentRead() async {
+  Future<RLSTestResult> _testOwnConsentRead() async {
     try {
       final uid = _db.auth.currentUser?.id;
       if (uid == null) {
-        return TestResult(
+        return RLSTestResult(
           name: 'Own consent read',
           passed: false,
           error: 'Not authenticated',
@@ -234,13 +233,13 @@ class RLSTestService {
 
       final rows = await _db.from('consent_log').select().eq('user_id', uid);
 
-      return TestResult(
+      return RLSTestResult(
         name: 'Own consent read',
         passed: true,
         details: 'Can read ${(rows as List).length} consent records',
       );
     } catch (e) {
-      return TestResult(
+      return RLSTestResult(
         name: 'Own consent read',
         passed: false,
         error: e.toString(),
@@ -248,11 +247,11 @@ class RLSTestService {
     }
   }
 
-  Future<TestResult> _testConsentImmutable() async {
+  Future<RLSTestResult> _testConsentImmutable() async {
     try {
       final uid = _db.auth.currentUser?.id;
       if (uid == null) {
-        return TestResult(
+        return RLSTestResult(
           name: 'Consent immutable',
           passed: false,
           error: 'Not authenticated',
@@ -263,7 +262,7 @@ class RLSTestService {
       final rows = await _db.from('consent_log').select('id').eq('user_id', uid).limit(1);
 
       if ((rows as List).isEmpty) {
-        return TestResult(
+        return RLSTestResult(
           name: 'Consent immutable',
           passed: true,
           details: 'No consent records to update (skipped)',
@@ -276,21 +275,21 @@ class RLSTestService {
         await _db.from('consent_log').update({'granted': false}).eq('id', consentId);
 
         // If we get here, UPDATE was allowed (BAD)
-        return TestResult(
+        return RLSTestResult(
           name: 'Consent immutable',
           passed: false,
           details: 'UPDATE was allowed (RLS not enforced)',
         );
       } catch (updateError) {
         // Expected — RLS should block UPDATE
-        return TestResult(
+        return RLSTestResult(
           name: 'Consent immutable',
           passed: true,
           details: 'RLS correctly blocked UPDATE',
         );
       }
     } catch (e) {
-      return TestResult(
+      return RLSTestResult(
         name: 'Consent immutable',
         passed: false,
         error: e.toString(),
@@ -298,11 +297,11 @@ class RLSTestService {
     }
   }
 
-  Future<TestResult> _testFriendRequestRLS() async {
+  Future<RLSTestResult> _testFriendRequestRLS() async {
     try {
       final uid = _db.auth.currentUser?.id;
       if (uid == null) {
-        return TestResult(
+        return RLSTestResult(
           name: 'Friend request RLS',
           passed: false,
           error: 'Not authenticated',
@@ -312,18 +311,13 @@ class RLSTestService {
       // Users should only see requests sent by them or to them
       final rows = await _db.from('friend_requests').select().limit(10);
 
-      // If RLS is working, this should either be empty or contain only their requests
-      final requestsFiltered = (rows as List)
-          .where((r) => r['from_uid'] == uid || r['to_uid'] == uid)
-          .length;
-
-      return TestResult(
+      return RLSTestResult(
         name: 'Friend request RLS',
         passed: true,
         details: 'Can see ${(rows as List).length} requests (RLS filtering applied)',
       );
     } catch (e) {
-      return TestResult(
+      return RLSTestResult(
         name: 'Friend request RLS',
         passed: false,
         error: e.toString(),

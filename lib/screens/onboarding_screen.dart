@@ -531,9 +531,9 @@ class _ConsentToggle extends StatelessWidget {
           ),
           const SizedBox(width: FlickSpacing.sm),
           Switch(
-            value:          value,
-            onChanged:      onChange,
-            activeColor:    FlickColors.primary,
+            value:             value,
+            onChanged:         onChange,
+            activeThumbColor:  FlickColors.primary,
             inactiveThumbColor: FlickColors.textMuted,
             inactiveTrackColor: FlickColors.surfaceDim,
           ),

@@ -86,7 +86,8 @@ class _DebugScreenState extends State<DebugScreen> {
     _add('🔒 Running RLS Security Tests…', true, warning: true);
 
     try {
-      final results = await RLSTestService().runAllTests();
+      final rls = RLSTestService();
+      final results = await rls.runAllTests();
       for (final result in results) {
         _add(result.name, result.passed, details: result.details, error: result.error);
       }

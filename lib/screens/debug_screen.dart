@@ -4,6 +4,7 @@ import 'package:flick_sdk/flick_sdk.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme/app_theme.dart';
 import '../services/supabase_sync_service.dart';
+import '../services/rls_test_service.dart';
 
 class DebugScreen extends StatefulWidget {
   const DebugScreen({super.key});
@@ -79,8 +80,25 @@ class _DebugScreenState extends State<DebugScreen> {
     setState(() => _running = false);
   }
 
-  void _add(String message, bool passed, {bool warning = false}) {
-    setState(() => _results.add(_TestResult(message, passed, warning)));
+  Future<void> _runRLSTests() async {
+    setState(() { _results.clear(); _running = true; });
+
+    _add('🔒 Running RLS Security Tests…', true, warning: true);
+
+    try {
+      final results = await RLSTestService().runAllTests();
+      for (final result in results) {
+        _add(result.name, result.passed, details: result.details, error: result.error);
+      }
+    } catch (e) {
+      _add('RLS test suite failed: $e', false);
+    }
+
+    setState(() => _running = false);
+  }
+
+  void _add(String message, bool passed, {bool warning = false, String? details, String? error}) {
+    setState(() => _results.add(_TestResult(message, passed, warning, details, error)));
   }
 
   @override
@@ -111,6 +129,17 @@ class _DebugScreenState extends State<DebugScreen> {
                             strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.play_arrow_rounded),
                 label: Text(_running ? 'Running…' : 'Run tests'),
+              ),
+            ),
+
+            const SizedBox(height: FlickSpacing.md),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _running ? null : _runRLSTests,
+                icon: const Icon(Icons.security_rounded),
+                label: const Text('🔒 Run RLS Security Tests'),
               ),
             ),
 
@@ -156,10 +185,12 @@ class _DebugScreenState extends State<DebugScreen> {
 }
 
 class _TestResult {
-  const _TestResult(this.message, this.passed, this.warning);
+  const _TestResult(this.message, this.passed, this.warning, [this.details, this.error]);
   final String message;
   final bool   passed;
   final bool   warning;
+  final String? details;
+  final String? error;
 }
 
 class _ResultRow extends StatelessWidget {
@@ -180,16 +211,32 @@ class _ResultRow extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: FlickSpacing.sm),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: FlickSpacing.sm),
-          Expanded(
-            child: Text(result.message,
-                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                      color: FlickColors.textPrimary)),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: FlickSpacing.sm),
+              Expanded(
+                child: Text(result.message,
+                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                          color: FlickColors.textPrimary)),
+              ),
+            ],
           ),
+          if (result.details != null || result.error != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 26, top: 4),
+              child: Text(
+                result.details ?? result.error ?? '',
+                style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                      color: result.error != null ? FlickColors.error : FlickColors.textSecondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+              ),
+            ),
         ],
       ).animate(delay: (index * 150).ms).fadeIn().slideX(begin: -0.05),
     );

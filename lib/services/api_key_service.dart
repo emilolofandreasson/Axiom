@@ -62,6 +62,26 @@ class ApiKeyService {
   bool _verify(String key) =>
       key.startsWith('AIzaSy') && key.length >= 35;
 
+  /// Tests a key by making a minimal real Gemini call.
+  /// Returns true only if the API responds successfully.
+  Future<bool> testKey(String key) async {
+    final trimmed = key.trim();
+    if (!_verify(trimmed)) return false;
+    try {
+      final proxyUrl = Env.proxyUrl.isNotEmpty ? Env.proxyUrl : null;
+      final bridge   = GeminiBridge(apiKey: trimmed, proxyUrl: proxyUrl);
+      await bridge.loadModel('');
+      final result = await bridge.complete(InferenceRequest(
+        prompt:      'Reply with the single word: OK',
+        maxTokens:   5,
+        temperature: 0.1,
+      ));
+      return result.isSuccess;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _syncToSupabase(String key) async {
     try {
       final uid = _uid;

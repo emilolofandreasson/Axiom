@@ -39,6 +39,9 @@ dependencies:
   # File system
   path_provider: ^2.1.1
 
+  # URL launching (used for Google AI Studio deep link in onboarding)
+  url_launcher: ^6.3.0
+
   # Speech recognition
   speech_to_text: ^6.6.0
 

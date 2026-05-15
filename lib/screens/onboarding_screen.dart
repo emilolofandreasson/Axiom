@@ -2,6 +2,7 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -45,11 +46,55 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   void _next() {
+    if (_currentPage == 4) {
+      // Gemini page — "Skip" shows confirmation dialog.
+      _showSkipGeminiDialog();
+      return;
+    }
     if (_currentPage < 5) {
       _pageController.nextPage(duration: 350.ms, curve: Curves.easeInOut);
     } else {
       _finish();
     }
+  }
+
+  void _goToNextPage() {
+    _pageController.nextPage(duration: 350.ms, curve: Curves.easeInOut);
+  }
+
+  void _onGeminiKeyVerified(String key) {
+    setState(() => _geminiApiKey = key);
+    _goToNextPage();
+  }
+
+  void _showSkipGeminiDialog() {
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: FlickColors.surface,
+        title: Text('Add your key later?',
+            style: Theme.of(context).textTheme.titleLarge),
+        content: Text(
+          'You can add your Gemini API key at any time in '
+          'Profile → Settings to help Axiom grow.',
+          style: Theme.of(context).textTheme.bodyMedium!
+              .copyWith(color: FlickColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Add key'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _goToNextPage();
+            },
+            child: const Text('Not now'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _prev() {
@@ -137,7 +182,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     onGoalSelected: (v) => setState(() => _selectedGoalXp = v),
                   ),
                   _GeminiKeyPage(
-                    onKeyChanged: (v) => setState(() => _geminiApiKey = v),
+                    onVerified: _onGeminiKeyVerified,
                   ),
                   _ConsentPage(
                     consentAnonymous: _consentAnonymous,
@@ -506,18 +551,23 @@ class _DailyGoalPage extends StatelessWidget {
 // Gemini API key page (optional)
 // ---------------------------------------------------------------------------
 
-class _GeminiKeyPage extends StatefulWidget {
-  const _GeminiKeyPage({required this.onKeyChanged});
+enum _KeyStatus { idle, validating, valid, invalid }
 
-  final ValueChanged<String> onKeyChanged;
+class _GeminiKeyPage extends StatefulWidget {
+  const _GeminiKeyPage({required this.onVerified});
+
+  /// Called with the verified key — parent navigates to next page.
+  final ValueChanged<String> onVerified;
 
   @override
   State<_GeminiKeyPage> createState() => _GeminiKeyPageState();
 }
 
 class _GeminiKeyPageState extends State<_GeminiKeyPage> {
-  final _controller = TextEditingController();
-  bool _obscure = true;
+  final _controller    = TextEditingController();
+  bool _obscure        = true;
+  bool _guideExpanded  = false;
+  _KeyStatus _status   = _KeyStatus.idle;
 
   @override
   void dispose() {
@@ -525,39 +575,56 @@ class _GeminiKeyPageState extends State<_GeminiKeyPage> {
     super.dispose();
   }
 
+  Future<void> _verifyKey() async {
+    final key = _controller.text.trim();
+    if (key.isEmpty) return;
+    setState(() => _status = _KeyStatus.validating);
+    final ok = await ApiKeyService().testKey(key);
+    if (!mounted) return;
+    setState(() => _status = ok ? _KeyStatus.valid : _KeyStatus.invalid);
+    if (ok) widget.onVerified(key);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasText = _controller.text.trim().isNotEmpty;
+    final isValidating = _status == _KeyStatus.validating;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
-        FlickSpacing.xl, FlickSpacing.xl, FlickSpacing.xl, FlickSpacing.md),
+        FlickSpacing.xl, FlickSpacing.xl, FlickSpacing.xl, FlickSpacing.xl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('🤖', style: TextStyle(fontSize: 52))
               .animate().fadeIn(duration: 300.ms),
           const SizedBox(height: FlickSpacing.lg),
-          Text(
-            'Help Axiom grow',
-            style: Theme.of(context).textTheme.displaySmall,
-          ).animate().fadeIn(delay: 80.ms, duration: 350.ms),
+
+          Text('Help Axiom grow',
+              style: Theme.of(context).textTheme.displaySmall)
+              .animate().fadeIn(delay: 80.ms, duration: 350.ms),
           const SizedBox(height: FlickSpacing.md),
+
           Text(
-            'Add your free Gemini API key and Axiom will silently generate '
-            'new questions in the background after your lessons — contributing '
-            'to a shared library that makes the app better for everyone.\n\n'
-            'Your key is only used on your device and never shared.',
-            style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                  color: FlickColors.textSecondary, height: 1.6),
+            'Add your free Gemini API key and Axiom will quietly generate '
+            'new practice questions in the background — contributing to a '
+            'shared library that makes the app better for everyone.\n\n'
+            'Your key stays on your device and is never shared.',
+            style: Theme.of(context).textTheme.bodyLarge!
+                .copyWith(color: FlickColors.textSecondary, height: 1.6),
           ).animate().fadeIn(delay: 160.ms, duration: 350.ms),
+
           const SizedBox(height: FlickSpacing.xl),
+
+          // ── Text field ──────────────────────────────────────────────────
           TextField(
             controller: _controller,
             obscureText: _obscure,
-            onChanged: widget.onKeyChanged,
+            onChanged: (_) => setState(() => _status = _KeyStatus.idle),
             style: Theme.of(context).textTheme.bodyMedium,
             decoration: InputDecoration(
               labelText: 'Gemini API key',
-              hintText: 'AIza...',
+              hintText: 'AIzaSy...',
               filled: true,
               fillColor: FlickColors.surface,
               border: OutlineInputBorder(
@@ -566,24 +633,207 @@ class _GeminiKeyPageState extends State<_GeminiKeyPage> {
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: const BorderRadius.all(FlickRadius.lg),
-                borderSide: const BorderSide(color: FlickColors.border),
+                borderSide: BorderSide(
+                  color: _status == _KeyStatus.valid
+                      ? Colors.green
+                      : _status == _KeyStatus.invalid
+                          ? Colors.red
+                          : FlickColors.border,
+                ),
               ),
               suffixIcon: IconButton(
                 icon: Icon(
-                  _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  _obscure
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
                   color: FlickColors.textMuted,
                 ),
                 onPressed: () => setState(() => _obscure = !_obscure),
               ),
             ),
           ).animate().fadeIn(delay: 240.ms, duration: 350.ms),
+
+          const SizedBox(height: FlickSpacing.sm),
+
+          // ── Status banner ───────────────────────────────────────────────
+          if (_status == _KeyStatus.valid)
+            _StatusBanner(
+              color: Colors.green.shade50,
+              borderColor: Colors.green.shade300,
+              icon: Icons.check_circle_rounded,
+              iconColor: Colors.green,
+              text: 'Key works! You\'re helping Axiom grow.',
+            ),
+          if (_status == _KeyStatus.invalid)
+            _StatusBanner(
+              color: Colors.red.shade50,
+              borderColor: Colors.red.shade300,
+              icon: Icons.error_rounded,
+              iconColor: Colors.red,
+              text: 'Key didn\'t work — double-check it and try again.',
+            ),
+
+          const SizedBox(height: FlickSpacing.md),
+
+          // ── Verify / Continue button ────────────────────────────────────
+          if (hasText && _status != _KeyStatus.valid)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: isValidating ? null : _verifyKey,
+                child: isValidating
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(_status == _KeyStatus.invalid
+                        ? 'Try again'
+                        : 'Verify key'),
+              ),
+            ),
+
+          const SizedBox(height: FlickSpacing.lg),
+
+          // ── "Don't have a key?" expandable guide ────────────────────────
+          GestureDetector(
+            onTap: () => setState(() => _guideExpanded = !_guideExpanded),
+            child: Row(
+              children: [
+                Text(
+                  'Don\'t have a key?',
+                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                        color: FlickColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  _guideExpanded
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                  color: FlickColors.primary,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+
+          if (_guideExpanded) ...[
+            const SizedBox(height: FlickSpacing.md),
+            _GuideStep(number: '1', text: 'Go to aistudio.google.com'),
+            _GuideStep(number: '2', text: 'Sign in with your Google account'),
+            _GuideStep(number: '3', text: 'Click "Get API key" and copy it'),
+            const SizedBox(height: FlickSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => launchUrl(
+                  Uri.parse('https://aistudio.google.com/apikey'),
+                  mode: LaunchMode.externalApplication,
+                ),
+                icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                label: const Text('Open Google AI Studio'),
+              ),
+            ),
+          ],
+
           const SizedBox(height: FlickSpacing.md),
           Text(
-            'Get a free key at aistudio.google.com → Get API key. '
-            'You can also add it later in Profile → Settings.',
-            style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                  color: FlickColors.textMuted),
-          ).animate().fadeIn(delay: 300.ms, duration: 350.ms),
+            'You can also add your key later in Profile → Settings.',
+            style: Theme.of(context).textTheme.bodySmall!
+                .copyWith(color: FlickColors.textMuted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusBanner extends StatelessWidget {
+  const _StatusBanner({
+    required this.color,
+    required this.borderColor,
+    required this.icon,
+    required this.iconColor,
+    required this.text,
+  });
+
+  final Color color;
+  final Color borderColor;
+  final IconData icon;
+  final Color iconColor;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      padding: const EdgeInsets.all(FlickSpacing.md),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: const BorderRadius.all(FlickRadius.md),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor, size: 18),
+          const SizedBox(width: FlickSpacing.sm),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodySmall!
+                  .copyWith(color: iconColor.withValues(alpha: 0.85)),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 200.ms).slideY(begin: -0.05, end: 0);
+  }
+}
+
+class _GuideStep extends StatelessWidget {
+  const _GuideStep({required this.number, required this.text});
+
+  final String number;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: FlickSpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 22,
+            height: 22,
+            decoration: const BoxDecoration(
+              color: FlickColors.primaryDim,
+              borderRadius: BorderRadius.all(FlickRadius.full),
+            ),
+            child: Center(
+              child: Text(
+                number,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: FlickColors.primary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: FlickSpacing.sm),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodyMedium!
+                  .copyWith(color: FlickColors.textSecondary),
+            ),
+          ),
         ],
       ),
     );

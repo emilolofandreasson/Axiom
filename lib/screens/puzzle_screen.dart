@@ -83,7 +83,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
         title: Text(widget.level.title),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: FlickSpacing.md),
+            padding: const EdgeInsets.only(right: FlickSpacing.sm),
             child: Center(
               child: Text(
                 'Level ${widget.level.levelNumber}  ·  ${widget.level.cefrLevel}',
@@ -93,6 +93,24 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                     .copyWith(color: FlickColors.textMuted),
               ),
             ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded),
+            onSelected: (value) {
+              if (value == 'restart') _onRetry();
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'restart',
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh_rounded, size: 18),
+                    SizedBox(width: 8),
+                    Text('Restart level'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -130,26 +148,19 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                   onUseReveal:     _onUseReveal,
                 ),
               ),
-
-              const SizedBox(height: FlickSpacing.sm),
-
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: _onRetry,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: FlickColors.textSecondary,
-                    side: const BorderSide(color: FlickColors.border),
-                  ),
-                  child: const Text('Restart level'),
-                ),
-              ),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+String _formatTime(int seconds) {
+  if (seconds < 60) return '${seconds}s';
+  final m = seconds ~/ 60;
+  final s = (seconds % 60).toString().padLeft(2, '0');
+  return '$m:$s';
 }
 
 // ---------------------------------------------------------------------------
@@ -244,7 +255,7 @@ class _CompletionScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _StatCard(label: 'Time',     value: '${timeSeconds}s'),
+                  _StatCard(label: 'Time',     value: _formatTime(timeSeconds)),
                   _StatCard(label: 'Attempts', value: '$attempts'),
                   _StatCard(label: 'XP',       value: '+${level.xpReward}'),
                 ],

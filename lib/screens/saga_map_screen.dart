@@ -5,20 +5,58 @@ import '../core/theme/app_theme.dart';
 import '../models/language.dart';
 import '../models/language_level.dart';
 import '../models/puzzle_level.dart';
+import '../providers/generated_puzzles_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/saga_provider.dart';
 import 'puzzle_screen.dart';
 import 'daily_lesson_screen.dart';
 
-class SagaMapScreen extends ConsumerWidget {
+class SagaMapScreen extends ConsumerStatefulWidget {
   const SagaMapScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final saga     = ref.watch(sagaProvider);
-    final language = ref.watch(languageProvider);
-    final levels   = kPuzzleLevelsByLanguage[language.code];
-    final hasLevels = levels != null;
+  ConsumerState<SagaMapScreen> createState() => _SagaMapScreenState();
+}
+
+class _SagaMapScreenState extends ConsumerState<SagaMapScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeGenerate());
+  }
+
+  void _maybeGenerate() {
+    final lang = ref.read(languageProvider);
+    if (!lang.hasContent) {
+      ref.read(generatedPuzzlesProvider.notifier).ensureLevels(
+        languageCode: lang.code,
+        languageName: lang.name,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final saga      = ref.watch(sagaProvider);
+    final language  = ref.watch(languageProvider);
+    final genState  = ref.watch(generatedPuzzlesProvider);
+
+    // Trigger generation when language changes to one without content.
+    ref.listen<Language>(languageProvider, (_, next) {
+      if (!next.hasContent) {
+        ref.read(generatedPuzzlesProvider.notifier).ensureLevels(
+          languageCode: next.code,
+          languageName: next.name,
+        );
+      }
+    });
+
+    // Use compiled levels if available, otherwise use AI-generated ones.
+    final compiledLevels = kPuzzleLevelsByLanguage[language.code];
+    final aiLevels       = genState.levelsByLanguage[language.code] ?? [];
+    final levels         = compiledLevels ?? (aiLevels.isNotEmpty ? aiLevels : null);
+    final hasLevels      = levels != null;
+    final isGenerating   = genState.isGenerating(language.code);
 
     // First level that is unlocked but not yet completed = "current".
     final currentLevelId = hasLevels
@@ -77,9 +115,12 @@ class SagaMapScreen extends ConsumerWidget {
 
           const SizedBox(height: FlickSpacing.xl),
 
-          // No puzzle content for this language yet
+          // No puzzle content yet — show generating indicator or placeholder
           if (!hasLevels) ...[
-            _NoContentPlaceholder(languageName: language.name),
+            if (isGenerating)
+              _GeneratingPuzzlesIndicator(languageName: language.name)
+            else if (!language.hasContent)
+              _NoContentPlaceholder(languageName: language.name),
             const SizedBox(height: FlickSpacing.xl),
           ],
 
@@ -176,6 +217,45 @@ class _LanguageHeader extends StatelessWidget {
 // No puzzle content placeholder
 // ---------------------------------------------------------------------------
 
+class _GeneratingPuzzlesIndicator extends StatelessWidget {
+  const _GeneratingPuzzlesIndicator({required this.languageName});
+  final String languageName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(FlickSpacing.xl),
+      decoration: BoxDecoration(
+        color:        FlickColors.primaryDim,
+        borderRadius: const BorderRadius.all(FlickRadius.xl),
+        border:       Border.all(color: FlickColors.primary.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(
+            width: 36, height: 36,
+            child: CircularProgressIndicator(strokeWidth: 3, color: FlickColors.primary),
+          ),
+          const SizedBox(height: FlickSpacing.md),
+          Text(
+            'Building your $languageName path…',
+            style: Theme.of(context).textTheme.labelLarge!.copyWith(
+                  color: FlickColors.primary),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: FlickSpacing.sm),
+          Text(
+            'Gemini is generating personalised puzzles for you.',
+            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                  color: FlickColors.textSecondary),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 400.ms);
+  }
+}
+
 class _NoContentPlaceholder extends StatelessWidget {
   const _NoContentPlaceholder({required this.languageName});
   final String languageName;
@@ -233,7 +313,7 @@ class _PowerupBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: FlickColors.primaryDim,
         borderRadius: const BorderRadius.all(FlickRadius.md),
-        border: Border.all(color: FlickColors.primary.withOpacity(0.3)),
+        border: Border.all(color: FlickColors.primary.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -303,13 +383,13 @@ class _LevelNode extends StatelessWidget {
                     ? FlickColors.success
                     : isUnlocked
                         ? FlickColors.border
-                        : FlickColors.border.withOpacity(0.4),
+                        : FlickColors.border.withValues(alpha: 0.4),
             width: isCurrent || isComplete ? 2 : 1,
           ),
           boxShadow: isCurrent
               ? [
                   BoxShadow(
-                    color:      FlickColors.primary.withOpacity(0.28),
+                    color:      FlickColors.primary.withValues(alpha: 0.28),
                     blurRadius: 20,
                     spreadRadius: 1,
                     offset:     const Offset(0, 4),
@@ -318,7 +398,7 @@ class _LevelNode extends StatelessWidget {
               : isUnlocked && !isComplete
                   ? [
                       BoxShadow(
-                        color:      FlickColors.primary.withOpacity(0.07),
+                        color:      FlickColors.primary.withValues(alpha: 0.07),
                         blurRadius: 16,
                         offset:     const Offset(0, 4),
                       )
@@ -429,7 +509,7 @@ class _PathConnector extends StatelessWidget {
           width: 2,
           decoration: BoxDecoration(
             color: complete
-                ? FlickColors.success.withOpacity(0.5)
+                ? FlickColors.success.withValues(alpha: 0.5)
                 : FlickColors.border,
           ),
         ),

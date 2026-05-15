@@ -159,7 +159,10 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                         const SizedBox(height: FlickSpacing.sm),
                         Text(
                           'You can change these settings at any time. We never share your name, '
-                          'email, or exact location.',
+                          'email, or exact location.\n\n'
+                          'Your answers to exercises are recorded locally and in our shared '
+                          'question library to calibrate difficulty for all learners (GDPR Art. 6.1.b). '
+                          'This data is included in your export and deleted when you close your account.',
                           style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                                 color: FlickColors.textSecondary,
                                 height: 1.6,

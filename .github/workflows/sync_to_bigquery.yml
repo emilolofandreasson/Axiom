@@ -1,0 +1,50 @@
+name: Sync Supabase → BigQuery
+
+on:
+  # Manual trigger from GitHub Actions tab
+  workflow_dispatch:
+
+  # Optional: run automatically on a schedule (uncomment to enable)
+  # schedule:
+  #   - cron: '0 3 * * *'  # Every day at 03:00 UTC
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create secrets.env from GitHub Secrets
+        run: |
+          cat > secrets.env << EOF
+          SUPABASE_USER=${{ secrets.SUPABASE_USER }}
+          SUPABASE_PASSWORD=${{ secrets.SUPABASE_PASSWORD }}
+          SUPABASE_HOST=${{ secrets.SUPABASE_HOST }}
+          SUPABASE_PORT=5432
+          SUPABASE_DB=postgres
+          BIGQUERY_PROJECT_ID=${{ secrets.BIGQUERY_PROJECT_ID }}
+          BIGQUERY_CREDENTIALS_FILE=google_creds.json
+          TABLES_TO_SYNC=
+          EOF
+
+      - name: Create google_creds.json from GitHub Secrets
+        run: echo '${{ secrets.GCP_CREDENTIALS_JSON }}' > google_creds.json
+
+      - name: Run sync
+        run: python sync_to_bq.py
+
+      - name: Cleanup secrets files
+        if: always()
+        run: |
+          rm -f secrets.env
+          rm -f google_creds.json

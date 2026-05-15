@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flick_sdk/flick_sdk.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../core/theme/app_theme.dart';
 import '../../models/lesson.dart';
 import '../../models/question.dart';
@@ -18,10 +19,14 @@ class AIChatPanel extends StatefulWidget {
     super.key,
     required this.question,
     required this.onComplete,
+    this.cefrLevel    = 'A1',
+    this.languageName = 'the target language',
   });
 
   final SpeakingQuestion question;
   final VoidCallback onComplete;
+  final String cefrLevel;
+  final String languageName;
 
   @override
   State<AIChatPanel> createState() => _AIChatPanelState();
@@ -32,8 +37,13 @@ class _AIChatPanelState extends State<AIChatPanel> {
   final _scrollCtrl  = ScrollController();
   final _focusNode   = FocusNode();
   final List<ChatMessage> _messages = [];
-  bool _isTyping   = false;
-  bool _canFinish  = false;
+  bool _isTyping     = false;
+  bool _canFinish    = false;
+
+  // Speech-to-text
+  final _speech      = stt.SpeechToText();
+  bool _sttAvailable = false;
+  bool _sttListening = false;
 
   void _onControllerChanged() => setState(() {});
 
@@ -41,6 +51,11 @@ class _AIChatPanelState extends State<AIChatPanel> {
   void initState() {
     super.initState();
     _controller.addListener(_onControllerChanged);
+    _speech.initialize(onStatus: (s) {
+      if (mounted) setState(() => _sttListening = s == 'listening');
+    }).then((ok) {
+      if (mounted) setState(() => _sttAvailable = ok);
+    });
     _addMessage(ChatMessage(
       id:        '0',
       role:      ChatRole.assistant,
@@ -55,7 +70,27 @@ class _AIChatPanelState extends State<AIChatPanel> {
     _controller.dispose();
     _scrollCtrl.dispose();
     _focusNode.dispose();
+    _speech.stop();
     super.dispose();
+  }
+
+  Future<void> _toggleStt() async {
+    if (_sttListening) {
+      await _speech.stop();
+      return;
+    }
+    await _speech.listen(
+      onResult: (result) {
+        if (result.finalResult) {
+          _controller.text = result.recognizedWords;
+          _controller.selection = TextSelection.collapsed(
+              offset: _controller.text.length);
+        }
+      },
+      listenFor: const Duration(seconds: 30),
+      pauseFor:  const Duration(seconds: 3),
+    );
+    setState(() => _sttListening = true);
   }
 
   Future<void> _send() async {
@@ -85,6 +120,8 @@ class _AIChatPanelState extends State<AIChatPanel> {
       userInput:           text,
       conversationContext: widget.question.conversationContext,
       history:             _messages,
+      cefrLevel:           widget.cefrLevel,
+      languageName:        widget.languageName,
     );
 
     if (!mounted) return;
@@ -98,7 +135,7 @@ class _AIChatPanelState extends State<AIChatPanel> {
     ));
 
     // Allow finishing after at least one exchange.
-    if (!_canFinish && _messages.where((m) => m.role == ChatRole.user).length >= 1) {
+    if (!_canFinish && _messages.any((m) => m.role == ChatRole.user)) {
       setState(() => _canFinish = true);
     }
   }
@@ -174,14 +211,21 @@ class _AIChatPanelState extends State<AIChatPanel> {
         // Input row
         Row(
           children: [
+            if (_sttAvailable) ...[
+              _MicButton(
+                listening: _sttListening,
+                onTap:     _toggleStt,
+              ),
+              const SizedBox(width: FlickSpacing.sm),
+            ],
             Expanded(
               child: TextField(
-                controller:   _controller,
-                focusNode:    _focusNode,
+                controller:      _controller,
+                focusNode:       _focusNode,
                 textInputAction: TextInputAction.send,
-                onSubmitted:  (_) => _send(),
-                decoration: const InputDecoration(
-                  hintText: 'Write your answer…',
+                onSubmitted:     (_) => _send(),
+                decoration: InputDecoration(
+                  hintText: _sttListening ? 'Listening…' : 'Write your answer…',
                 ),
               ),
             ),
@@ -224,28 +268,32 @@ Future<String> _sendToAI({
   required String userInput,
   required String conversationContext,
   required List<ChatMessage> history,
+  String cefrLevel = 'A1',
+  String languageName = 'the target language',
 }) async {
   try {
-    // Keep only the last 6 messages (3 turns) to bound token usage.
-    final recentHistory = history.length > 6 ? history.sublist(history.length - 6) : history;
+    // Keep only the last 8 messages (4 turns) to bound token usage.
+    final recentHistory = history.length > 8 ? history.sublist(history.length - 8) : history;
     final historyText = recentHistory
         .map((m) => '${m.role == ChatRole.assistant ? "Tutor" : "Student"}: ${m.text}')
         .join('\n');
 
     final prompt =
-        'You are a friendly language tutor helping a student practise. '
-        'Keep replies to 1–3 short sentences. Be encouraging, gently correct '
-        'mistakes, and always end with a follow-up question to keep the student '
-        'talking. Use the target language with brief English explanations when '
-        'needed.\n\n'
-        'Context: $conversationContext\n\n'
+        'You are a friendly, encouraging language tutor helping a student practise $languageName '
+        'at CEFR level $cefrLevel. '
+        'Keep your replies to 1–3 short sentences. '
+        'Gently correct grammar mistakes by showing the correct form in brackets. '
+        'Always end with a follow-up question in $languageName (with a brief English translation) '
+        'to keep the conversation going. '
+        'Match your vocabulary and sentence complexity to CEFR $cefrLevel.\n\n'
+        'Exercise context: $conversationContext\n\n'
         'Conversation so far:\n$historyText\n\n'
         'Student: $userInput\n\n'
         'Tutor:';
 
     final result = await lessonGenerator.bridge.complete(InferenceRequest(
       prompt:      prompt,
-      maxTokens:   200,
+      maxTokens:   220,
       temperature: 0.7,
     ));
 
@@ -373,5 +421,45 @@ class _SendButton extends StatelessWidget {
             color: Colors.white, size: 20),
       ),
     );
+  }
+}
+
+class _MicButton extends StatelessWidget {
+  const _MicButton({required this.listening, required this.onTap});
+  final bool listening;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final button = GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: 200.ms,
+        width: 44, height: 44,
+        decoration: BoxDecoration(
+          color: listening
+              ? FlickColors.error.withValues(alpha: 0.15)
+              : FlickColors.surfaceDim,
+          borderRadius: const BorderRadius.all(FlickRadius.full),
+          border: Border.all(
+            color: listening ? FlickColors.error : FlickColors.border,
+            width: listening ? 1.5 : 1,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Icon(
+          listening ? Icons.mic_rounded : Icons.mic_none_rounded,
+          color: listening ? FlickColors.error : FlickColors.textMuted,
+          size: 20,
+        ),
+      ),
+    );
+
+    if (!listening) return button;
+
+    // Pulse while listening — repeating scale animation.
+    return button
+        .animate(onPlay: (c) => c.repeat(reverse: true))
+        .scaleXY(begin: 1.0, end: 1.08, duration: 600.ms, curve: Curves.easeInOut);
   }
 }

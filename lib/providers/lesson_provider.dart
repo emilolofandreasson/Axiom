@@ -1,12 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flick_sdk/flick_sdk.dart';
 import '../models/lesson.dart';
+import '../models/language_level.dart';
 import '../models/question.dart';
 import 'language_provider.dart';
+import 'review_provider.dart';
 import 'saga_provider.dart';
 import 'daily_goal_provider.dart';
 import 'hearts_provider.dart';
-import '../main.dart' show lessonGenerator;
+import '../main.dart' show lessonGenerator, questionLibrary;
 
 // ---------------------------------------------------------------------------
 // Lesson state
@@ -39,6 +41,9 @@ class LessonState {
     this.questionStartedAt,
     this.isGenerating = false,
     this.lastGenerationFailed = false,
+    this.newStreak = 0,
+    this.prevLevelLabel,
+    this.newLevelLabel,
   });
 
   final Lesson lesson;
@@ -50,6 +55,11 @@ class LessonState {
   final LessonStatus status;
   final AnswerState currentAnswerState;
   final DateTime? questionStartedAt;
+  /// Streak count after completing this lesson (0 = unchanged or first day).
+  final int newStreak;
+  /// Non-null when the player leveled up this lesson.
+  final String? prevLevelLabel;
+  final String? newLevelLabel;
 
   Question get currentQuestion => lesson.questions[currentIndex];
   bool get isLastQuestion => currentIndex >= lesson.questions.length - 1;
@@ -73,6 +83,9 @@ class LessonState {
     DateTime? questionStartedAt,
     bool? isGenerating,
     bool? lastGenerationFailed,
+    int? newStreak,
+    Object? prevLevelLabel = _sentinel,
+    Object? newLevelLabel  = _sentinel,
   }) =>
       LessonState(
         lesson:                lesson               ?? this.lesson,
@@ -84,8 +97,17 @@ class LessonState {
         questionStartedAt:     questionStartedAt    ?? this.questionStartedAt,
         isGenerating:          isGenerating         ?? this.isGenerating,
         lastGenerationFailed:  lastGenerationFailed ?? this.lastGenerationFailed,
+        newStreak:             newStreak            ?? this.newStreak,
+        prevLevelLabel:        prevLevelLabel == _sentinel
+            ? this.prevLevelLabel
+            : prevLevelLabel as String?,
+        newLevelLabel:         newLevelLabel == _sentinel
+            ? this.newLevelLabel
+            : newLevelLabel as String?,
       );
 }
+
+const _sentinel = Object();
 
 // ---------------------------------------------------------------------------
 // Notifier
@@ -238,6 +260,15 @@ class LessonNotifier extends Notifier<LessonState> {
       }
     }
 
+    // Record answer in global library (fire-and-forget, only for library questions).
+    if (q.globalId != null) {
+      questionLibrary.recordAnswer(
+        questionId: q.globalId!,
+        isCorrect:  isCorrect,
+        lessonId:   state.lesson.id,
+      );
+    }
+
     EventSensor.instance.emit('answer_submitted', {
       'lesson_id':     state.lesson.id,
       'question_id':   q.id,
@@ -280,14 +311,31 @@ class LessonNotifier extends Notifier<LessonState> {
   }
 
   void _completeLesson() {
-    state = state.copyWith(status: LessonStatus.completed);
-
-    final xp = state.lesson.xpReward;
+    final xp           = state.lesson.xpReward;
+    final langCode     = state.lesson.courseLanguage;
+    final sagaBefore   = ref.read(sagaProvider);
+    final xpBefore     = sagaBefore.xpForLanguage(langCode);
+    final prevLevel    = levelForXp(xpBefore);
 
     // Award XP to saga (persists to Firestore) and daily goal.
-    ref.read(sagaProvider.notifier).awardLessonXp(
-          xp, languageCode: state.lesson.courseLanguage);
+    ref.read(sagaProvider.notifier).awardLessonXp(xp, languageCode: langCode);
     ref.read(dailyGoalProvider.notifier).addXp(xp);
+
+    final sagaAfter  = ref.read(sagaProvider);
+    final newStreak  = sagaAfter.streakCount;
+    final newLevel   = levelForXp(sagaAfter.xpForLanguage(langCode));
+    final leveledUp  = newLevel.label != prevLevel.label;
+
+    state = state.copyWith(
+      status:        LessonStatus.completed,
+      newStreak:     newStreak,
+      prevLevelLabel: leveledUp ? prevLevel.label : null,
+      newLevelLabel:  leveledUp ? newLevel.label  : null,
+    );
+
+    // Save wrong answers for spaced repetition review.
+    unawaited(ref.read(reviewProvider.notifier)
+        .addWrongAnswers(state.results, langCode));
 
     // Refill hearts on lesson complete (reward for finishing).
     if (state.accuracy >= 0.8) {

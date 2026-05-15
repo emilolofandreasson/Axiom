@@ -41,29 +41,31 @@ class FriendService {
   SupabaseClient get _db => Supabase.instance.client;
   String? get _uid       => _db.auth.currentUser?.id;
 
-  Future<void> sendRequest(UserProfile to, UserProfile from) async {
+  Future<bool> sendRequest(UserProfile to, UserProfile from) async {
     final uid = _uid;
-    if (uid == null) return;
+    if (uid == null) return false;
 
     // Prevent duplicates.
-    final existing = await _db
-        .from('friend_requests')
-        .select()
-        .eq('from_uid', uid)
-        .eq('to_uid', to.uid)
-        .maybeSingle();
-    if (existing != null) return;
-
     try {
+      final existing = await _db
+          .from('friend_requests')
+          .select()
+          .eq('from_uid', uid)
+          .eq('to_uid', to.uid)
+          .maybeSingle();
+      if (existing != null) return false;
+
       await _db.from('friend_requests').insert({
         'from_uid':       uid,
-        'from_name':      from.name,
+        'from_name':      from.name.isNotEmpty ? from.name : 'User',
         'from_photo_url': from.photoUrl,
         'to_uid':         to.uid,
         'status':         'pending',
       });
+      return true;
     } catch (e) {
       debugPrint('[FriendService] sendRequest error: $e');
+      return false;
     }
   }
 
@@ -145,6 +147,36 @@ class FriendService {
           .toList();
     } catch (e) {
       debugPrint('[FriendService] friendsList error: $e');
+      return [];
+    }
+  }
+
+  /// Returns friends + self, sorted by total_xp descending.
+  Future<List<UserProfile>> leaderboard() async {
+    final uid = _uid;
+    if (uid == null) return [];
+    try {
+      final friendRows = await _db
+          .from('user_friends')
+          .select('friend_id')
+          .eq('user_id', uid);
+
+      final friendIds = (friendRows as List)
+          .map((r) => r['friend_id'] as String)
+          .toList();
+
+      final allIds = [uid, ...friendIds];
+      final userRows = await _db
+          .from('users')
+          .select('id, name, photo_url, total_xp, streak_count')
+          .inFilter('id', allIds)
+          .order('total_xp', ascending: false);
+
+      return (userRows as List)
+          .map((d) => UserProfile.fromMap(d['id'] as String, d as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('[FriendService] leaderboard error: $e');
       return [];
     }
   }

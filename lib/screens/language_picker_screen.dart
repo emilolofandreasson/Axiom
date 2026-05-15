@@ -34,10 +34,12 @@ class LanguagePickerScreen extends ConsumerWidget {
           return _LanguageCard(
             language:   lang,
             isSelected: isSelected,
-            onTap: () {
-              ref.read(languageProvider.notifier).selectLanguage(lang);
-              Navigator.pop(context);
-            },
+            onTap: lang.hasContent
+                ? () {
+                    ref.read(languageProvider.notifier).selectLanguage(lang);
+                    Navigator.pop(context);
+                  }
+                : null,
           )
               .animate(delay: (i * 40).ms)
               .fadeIn(duration: 250.ms)
@@ -57,7 +59,7 @@ class _LanguageCard extends StatelessWidget {
 
   final Language language;
   final bool isSelected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +69,7 @@ class _LanguageCard extends StatelessWidget {
         duration: 200.ms,
         padding: const EdgeInsets.all(FlickSpacing.md),
         decoration: BoxDecoration(
-          color:        FlickColors.surface,
+          color: language.hasContent ? FlickColors.surface : FlickColors.surfaceDim,
           borderRadius: const BorderRadius.all(FlickRadius.lg),
           border: Border.all(
             color: isSelected ? FlickColors.primary : FlickColors.border,
@@ -128,7 +130,7 @@ class _LanguageCard extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: FlickColors.textMuted.withOpacity(0.15),
+                    color: FlickColors.textMuted.withValues(alpha: 0.15),
                     borderRadius: const BorderRadius.all(FlickRadius.full),
                   ),
                   child: const Text(

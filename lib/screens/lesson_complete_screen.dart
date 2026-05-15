@@ -11,7 +11,10 @@ class LessonCompleteScreen extends StatelessWidget {
     required this.totalCount,
     required this.xpEarned,
     required this.onContinue,
-    this.wrongAnswers = const [],
+    this.wrongAnswers    = const [],
+    this.newStreak       = 0,
+    this.prevLevelLabel,
+    this.newLevelLabel,
   });
 
   final int correctCount;
@@ -19,6 +22,9 @@ class LessonCompleteScreen extends StatelessWidget {
   final int xpEarned;
   final VoidCallback onContinue;
   final List<QuestionResult> wrongAnswers;
+  final int newStreak;
+  final String? prevLevelLabel;
+  final String? newLevelLabel;
 
   double get _accuracy => totalCount == 0 ? 0.0 : correctCount / totalCount;
   bool   get _celebrating => _accuracy >= 0.8;
@@ -125,31 +131,71 @@ class LessonCompleteScreen extends StatelessWidget {
               const SizedBox(height: FlickSpacing.xl),
 
               // Stats row
-              Row(
-                children: [
-                  _ResultStat(
-                    value: '$correctCount / $totalCount',
-                    label: 'Correct',
-                    color: FlickColors.success,
-                  ),
-                  const SizedBox(width: FlickSpacing.md),
-                  _ResultStat(
-                    value: '+$xpEarned XP',
-                    label: 'Earned',
-                    color: FlickColors.primary,
-                  ),
-                  const SizedBox(width: FlickSpacing.md),
-                  _ResultStat(
-                    value: '${(_accuracy * 100).round()}%',
-                    label: 'Accuracy',
-                    color: _accuracy >= 0.7
-                        ? FlickColors.success
-                        : FlickColors.warning,
-                  ),
-                ],
+              TweenAnimationBuilder<int>(
+                tween: IntTween(begin: 0, end: xpEarned),
+                duration: 800.ms,
+                curve: Curves.easeOut,
+                builder: (_, animatedXp, __) => Row(
+                  children: [
+                    _ResultStat(
+                      value: '$correctCount / $totalCount',
+                      label: 'Correct',
+                      color: FlickColors.success,
+                    ),
+                    const SizedBox(width: FlickSpacing.md),
+                    _ResultStat(
+                      value: '+$animatedXp XP',
+                      label: 'Earned',
+                      color: FlickColors.primary,
+                    ),
+                    const SizedBox(width: FlickSpacing.md),
+                    _ResultStat(
+                      value: '${(_accuracy * 100).round()}%',
+                      label: 'Accuracy',
+                      color: _accuracy >= 0.7
+                          ? FlickColors.success
+                          : FlickColors.warning,
+                    ),
+                  ],
+                ),
               ).animate().fadeIn(delay: 360.ms, duration: 350.ms),
 
               const Spacer(flex: 2),
+
+              // Level-up banner
+              if (newLevelLabel != null)
+                _CelebrationBanner(
+                  icon: '🏆',
+                  text: 'Level up! $prevLevelLabel → $newLevelLabel',
+                  color: FlickColors.primary,
+                  bgColor: FlickColors.primaryDim,
+                  delay: 400,
+                ),
+
+              // Streak banner
+              if (newStreak > 1)
+                _CelebrationBanner(
+                  icon: '🔥',
+                  text: '$newStreak day streak!',
+                  color: FlickColors.warning,
+                  bgColor: FlickColors.warning.withValues(alpha: 0.12),
+                  delay: newLevelLabel != null ? 480 : 400,
+                ),
+
+              if (newStreak > 1 || newLevelLabel != null)
+                const SizedBox(height: FlickSpacing.md),
+
+              if (wrongAnswers.isNotEmpty)
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => _showReview(context),
+                    child: const Text('Review mistakes'),
+                  ),
+                ).animate().fadeIn(delay: 450.ms),
+
+              if (wrongAnswers.isNotEmpty)
+                const SizedBox(height: FlickSpacing.md),
 
               SizedBox(
                 width: double.infinity,
@@ -157,21 +203,7 @@ class LessonCompleteScreen extends StatelessWidget {
                   onPressed: onContinue,
                   child: const Text('Next lesson'),
                 ),
-              ).animate().fadeIn(delay: 450.ms),
-
-              const SizedBox(height: FlickSpacing.md),
-
-              if (wrongAnswers.isNotEmpty)
-                SizedBox(
-                  width: double.infinity,
-                  child: TextButton(
-                    onPressed: () => _showReview(context),
-                    child: const Text(
-                      'Review mistakes',
-                      style: TextStyle(color: FlickColors.textSecondary),
-                    ),
-                  ),
-                ).animate().fadeIn(delay: 500.ms),
+              ).animate().fadeIn(delay: 500.ms),
 
               const SizedBox(height: FlickSpacing.lg),
             ],
@@ -202,7 +234,7 @@ class _ReviewCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: FlickColors.errorDim,
         borderRadius: const BorderRadius.all(FlickRadius.lg),
-        border: Border.all(color: FlickColors.error.withOpacity(0.3)),
+        border: Border.all(color: FlickColors.error.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -372,5 +404,51 @@ class _ResultStat extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _CelebrationBanner extends StatelessWidget {
+  const _CelebrationBanner({
+    required this.icon,
+    required this.text,
+    required this.color,
+    required this.bgColor,
+    required this.delay,
+  });
+
+  final String icon;
+  final String text;
+  final Color color;
+  final Color bgColor;
+  final int delay;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: FlickSpacing.md,
+        vertical: FlickSpacing.sm + 2,
+      ),
+      decoration: BoxDecoration(
+        color:        bgColor,
+        borderRadius: const BorderRadius.all(FlickRadius.md),
+        border:       Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(icon, style: const TextStyle(fontSize: 20)),
+          const SizedBox(width: FlickSpacing.sm),
+          Text(
+            text,
+            style: Theme.of(context).textTheme.labelLarge!.copyWith(color: color),
+          ),
+        ],
+      ),
+    )
+        .animate()
+        .fadeIn(delay: Duration(milliseconds: delay), duration: 350.ms)
+        .slideY(begin: 0.15, end: 0, duration: 350.ms, delay: Duration(milliseconds: delay));
   }
 }

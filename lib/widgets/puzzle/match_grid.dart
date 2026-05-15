@@ -310,7 +310,7 @@ class _MatchTile extends StatelessWidget {
             ),
             boxShadow: tile.state == _TileState.selected
                 ? [BoxShadow(
-                    color:       FlickColors.primary.withOpacity(0.28),
+                    color:       FlickColors.primary.withValues(alpha: 0.28),
                     blurRadius:  12,
                     spreadRadius: 1,
                   )]

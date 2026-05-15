@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -15,6 +16,18 @@ import 'debug_screen.dart';
 import 'edit_profile_screen.dart';
 import 'friends_screen.dart';
 import 'privacy_settings_screen.dart';
+
+const _kCountryNames = {
+  'SE': '🇸🇪 Sweden',     'US': '🇺🇸 United States', 'GB': '🇬🇧 United Kingdom',
+  'DE': '🇩🇪 Germany',    'FR': '🇫🇷 France',        'ES': '🇪🇸 Spain',
+  'NO': '🇳🇴 Norway',     'DK': '🇩🇰 Denmark',       'FI': '🇫🇮 Finland',
+  'NL': '🇳🇱 Netherlands','IT': '🇮🇹 Italy',          'PL': '🇵🇱 Poland',
+  'AU': '🇦🇺 Australia',  'CA': '🇨🇦 Canada',         'JP': '🇯🇵 Japan',
+  'BR': '🇧🇷 Brazil',     'IN': '🇮🇳 India',          'CN': '🇨🇳 China',
+  'MX': '🇲🇽 Mexico',     'ZA': '🇿🇦 South Africa',
+};
+
+String _countryDisplay(String code) => _kCountryNames[code] ?? code;
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -82,16 +95,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               child: Column(
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       CircleAvatar(
-                        radius: 28,
+                        radius: 36,
                         backgroundColor: FlickColors.primaryDim,
                         backgroundImage: _profile?.photoUrl != null
                             ? NetworkImage(_profile!.photoUrl!)
                             : null,
                         child: _profile?.photoUrl == null
                             ? const Icon(Icons.person_rounded,
-                                color: FlickColors.primary, size: 28)
+                                color: FlickColors.primary, size: 34)
                             : null,
                       ),
                       const SizedBox(width: FlickSpacing.md),
@@ -105,13 +119,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   : (authService.currentUser?.email ?? 'Learner'),
                               style: Theme.of(context).textTheme.labelLarge,
                             ),
-                            const SizedBox(height: 2),
+                            if (_profile?.country != null ||
+                                _profile?.birthYear != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                [
+                                  if (_profile?.country != null)
+                                    _countryDisplay(_profile!.country!),
+                                  if (_profile?.birthYear != null)
+                                    'b. ${_profile!.birthYear}',
+                                ].join(' · '),
+                                style: Theme.of(context).textTheme.bodyMedium!
+                                    .copyWith(color: FlickColors.textMuted),
+                              ),
+                            ],
+                            const SizedBox(height: 4),
                             Text(
                               _profile?.bio.isNotEmpty == true
                                   ? _profile!.bio
                                   : 'Tap Edit to add a bio',
                               style: Theme.of(context).textTheme.bodyMedium,
-                              maxLines: 2,
+                              maxLines: 3,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
@@ -119,6 +147,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                     ],
                   ),
+
+                  // Persona chips
+                  if (_profile != null) ...[
+                    const SizedBox(height: FlickSpacing.md),
+                    _PersonaChips(profile: _profile!),
+                  ],
                   const SizedBox(height: FlickSpacing.md),
                   SizedBox(
                     width: double.infinity,
@@ -304,19 +338,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             const SizedBox(height: FlickSpacing.md),
 
-            // Database test button
-            OutlinedButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DebugScreen()),
-              ),
-              icon: const Icon(Icons.biotech_rounded, size: 18),
-              label: const Text('Test database connection'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: FlickColors.textSecondary,
-                side: const BorderSide(color: FlickColors.border),
-              ),
-            ).animate().fadeIn(delay: 420.ms),
+            if (kDebugMode)
+              OutlinedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DebugScreen()),
+                ),
+                icon: const Icon(Icons.biotech_rounded, size: 18),
+                label: const Text('Test database connection'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: FlickColors.textSecondary,
+                  side: const BorderSide(color: FlickColors.border),
+                ),
+              ).animate().fadeIn(delay: 420.ms),
 
             const SizedBox(height: FlickSpacing.lg),
 
@@ -493,6 +527,81 @@ class _LanguageProgressCard extends StatelessWidget {
       ),
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Persona chips displayed on profile card
+// ---------------------------------------------------------------------------
+
+class _PersonaChips extends StatelessWidget {
+  const _PersonaChips({required this.profile});
+  final UserProfile profile;
+
+  static const _motivationLabel = {
+    'travel': ('✈️', 'Travel'),   'work':    ('💼', 'Work'),
+    'family': ('👨‍👩‍👧', 'Family'), 'culture': ('🎭', 'Culture'),
+    'fun':    ('🎉', 'Fun'),
+  };
+  static const _goalLabel = {
+    'conversational': ('💬', 'Conversational'), 'business': ('📊', 'Business'),
+    'travel':         ('🗺️', 'Travel phrases'), 'academic': ('📚', 'Academic'),
+  };
+  static const _availLabel = {
+    'morning': ('🌅', 'Morning'), 'afternoon': ('☀️', 'Afternoon'),
+    'evening': ('🌙', 'Evening'), 'flexible':  ('🔄', 'Flexible'),
+  };
+  static const _interestLabel = {
+    'food': '🍜', 'travel': '🌍', 'music': '🎵', 'sport': '⚽',
+    'film': '🎬', 'tech': '💻', 'books': '📖', 'nature': '🌿',
+    'fashion': '👗', 'business': '💼',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = <Widget>[];
+
+    void add(String? key, Map<String, (String, String)> map) {
+      if (key == null) return;
+      final entry = map[key];
+      if (entry == null) return;
+      chips.add(_Chip('${entry.$1} ${entry.$2}'));
+    }
+
+    add(profile.motivation,   _motivationLabel);
+    add(profile.learningGoal, _goalLabel);
+    add(profile.availability, _availLabel);
+
+    for (final tag in profile.interests.take(4)) {
+      final emoji = _interestLabel[tag];
+      if (emoji != null) chips.add(_Chip('$emoji $tag'));
+    }
+
+    if (chips.isEmpty) return const SizedBox.shrink();
+
+    return Wrap(spacing: FlickSpacing.xs + 2, runSpacing: FlickSpacing.xs + 2,
+        children: chips);
+  }
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: FlickSpacing.sm + 2, vertical: FlickSpacing.xs),
+        decoration: BoxDecoration(
+          color: FlickColors.surfaceDim,
+          borderRadius: const BorderRadius.all(FlickRadius.full),
+          border: Border.all(color: FlickColors.border),
+        ),
+        child: Text(label,
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium!
+                .copyWith(fontSize: 12, color: FlickColors.textSecondary)),
+      );
 }
 
 class _AiKeyCard extends StatefulWidget {

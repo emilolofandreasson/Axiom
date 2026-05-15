@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flick_sdk/flick_sdk.dart';
 import '../core/theme/app_theme.dart';
 import '../models/language.dart';
+import '../providers/daily_goal_provider.dart';
 import '../providers/language_provider.dart';
 import 'main_screen.dart';
 
@@ -28,6 +29,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   bool _consentAnonymous = false;
   bool _consentPartner   = false;
 
+  // Daily goal — user picks in onboarding step 4.
+  int _selectedGoalXp = kDefaultDailyXpGoal;
+
   @override
   void dispose() {
     _pageController.dispose();
@@ -35,10 +39,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   void _next() {
-    if (_currentPage < 3) {
+    if (_currentPage < 4) {
       _pageController.nextPage(duration: 350.ms, curve: Curves.easeInOut);
     } else {
       _finish();
+    }
+  }
+
+  void _prev() {
+    if (_currentPage > 0) {
+      _pageController.previousPage(duration: 350.ms, curve: Curves.easeInOut);
     }
   }
 
@@ -50,12 +60,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     await prefs.setString('consent_policy_version', _kPolicyVersion);
     await prefs.setString('consent_shown_at', DateTime.now().toIso8601String());
 
+    // Persist chosen daily goal.
+    await ref.read(dailyGoalProvider.notifier).setGoal(_selectedGoalXp);
+
     // Analytics + consent log (non-blocking).
     _logConsentToSupabase();
     EventSensor.instance.emit('onboarding_completed', {
       'consent_anonymous_stats': _consentAnonymous,
       'consent_partner_profile': _consentPartner,
       'policy_version':          _kPolicyVersion,
+      'daily_goal_xp':           _selectedGoalXp,
     });
 
     if (!mounted) return;
@@ -107,6 +121,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   const _WelcomePage(),
                   const _HowItWorksPage(),
                   const _ChooseLanguagePage(),
+                  _DailyGoalPage(
+                    selectedGoalXp: _selectedGoalXp,
+                    onGoalSelected: (v) => setState(() => _selectedGoalXp = v),
+                  ),
                   _ConsentPage(
                     consentAnonymous: _consentAnonymous,
                     consentPartner:   _consentPartner,
@@ -118,8 +136,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             ),
             _BottomBar(
               currentPage: _currentPage,
-              totalPages:  4,
+              totalPages:  5,
               onContinue:  _next,
+              onBack:      _prev,
             ),
           ],
         ),
@@ -254,9 +273,9 @@ class _ChooseLanguagePage extends ConsumerWidget {
                 return _OnboardingLanguageCard(
                   language: lang,
                   isSelected: isSelected,
-                  onTap: () {
-                    ref.read(languageProvider.notifier).selectLanguage(lang);
-                  },
+                  onTap: lang.hasContent
+                      ? () => ref.read(languageProvider.notifier).selectLanguage(lang)
+                      : null,
                 )
                     .animate(delay: (i * 40).ms)
                     .fadeIn(duration: 250.ms)
@@ -279,7 +298,7 @@ class _OnboardingLanguageCard extends StatelessWidget {
 
   final Language language;
   final bool isSelected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -289,7 +308,7 @@ class _OnboardingLanguageCard extends StatelessWidget {
         duration: 200.ms,
         padding: const EdgeInsets.all(FlickSpacing.md),
         decoration: BoxDecoration(
-          color: FlickColors.surface,
+          color: language.hasContent ? FlickColors.surface : FlickColors.surfaceDim,
           borderRadius: const BorderRadius.all(FlickRadius.lg),
           border: Border.all(
             color: isSelected ? FlickColors.primary : FlickColors.border,
@@ -346,7 +365,7 @@ class _OnboardingLanguageCard extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: FlickColors.textMuted.withOpacity(0.15),
+                    color: FlickColors.textMuted.withValues(alpha: 0.15),
                     borderRadius: const BorderRadius.all(FlickRadius.full),
                   ),
                   child: const Text(
@@ -361,6 +380,108 @@ class _OnboardingLanguageCard extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Daily goal selection page
+// ---------------------------------------------------------------------------
+
+class _DailyGoalPage extends StatelessWidget {
+  const _DailyGoalPage({
+    required this.selectedGoalXp,
+    required this.onGoalSelected,
+  });
+
+  final int selectedGoalXp;
+  final ValueChanged<int> onGoalSelected;
+
+  static const _options = [
+    (xp: 10, emoji: '🌱', label: 'Casual',    sub: '~5 min / day'),
+    (xp: 20, emoji: '⚡', label: 'Regular',   sub: '~10 min / day'),
+    (xp: 50, emoji: '🔥', label: 'Intensive', sub: '~20 min / day'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: FlickSpacing.xl,
+        vertical:   FlickSpacing.xl,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Set your daily goal',
+            style: Theme.of(context).textTheme.displaySmall,
+          ).animate().fadeIn(duration: 300.ms),
+          const SizedBox(height: FlickSpacing.sm),
+          Text(
+            'You can change this any time in settings.',
+            style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                  color: FlickColors.textSecondary),
+          ).animate().fadeIn(delay: 80.ms, duration: 300.ms),
+          const SizedBox(height: FlickSpacing.xl),
+          ..._options.asMap().entries.map((e) {
+            final opt      = e.value;
+            final selected = opt.xp == selectedGoalXp;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: FlickSpacing.md),
+              child: GestureDetector(
+                onTap: () => onGoalSelected(opt.xp),
+                child: AnimatedContainer(
+                  duration: 180.ms,
+                  padding: const EdgeInsets.all(FlickSpacing.md),
+                  decoration: BoxDecoration(
+                    color: selected ? FlickColors.primaryDim : FlickColors.surface,
+                    borderRadius: const BorderRadius.all(FlickRadius.lg),
+                    border: Border.all(
+                      color: selected ? FlickColors.primary : FlickColors.border,
+                      width: selected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(opt.emoji, style: const TextStyle(fontSize: 28)),
+                      const SizedBox(width: FlickSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(opt.label,
+                                style: Theme.of(context).textTheme.labelLarge),
+                            Text(opt.sub,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium!
+                                    .copyWith(color: FlickColors.textSecondary)),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        '${opt.xp} XP',
+                        style: Theme.of(context).textTheme.labelLarge!.copyWith(
+                              color: selected
+                                  ? FlickColors.primary
+                                  : FlickColors.textMuted),
+                      ),
+                      if (selected) ...[
+                        const SizedBox(width: FlickSpacing.sm),
+                        const Icon(Icons.check_circle_rounded,
+                            color: FlickColors.primary, size: 20),
+                      ],
+                    ],
+                  ),
+                ),
+              ).animate(delay: Duration(milliseconds: 160 + e.key * 80))
+                  .fadeIn(duration: 250.ms)
+                  .slideY(begin: 0.06, end: 0, duration: 250.ms),
+            );
+          }),
+        ],
       ),
     );
   }
@@ -554,11 +675,13 @@ class _BottomBar extends StatelessWidget {
     required this.currentPage,
     required this.totalPages,
     required this.onContinue,
+    this.onBack,
   });
 
   final int currentPage;
   final int totalPages;
   final VoidCallback onContinue;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -572,6 +695,7 @@ class _BottomBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          // Progress dots
           Row(
             children: List.generate(totalPages, (i) {
               final active = i == currentPage;
@@ -587,9 +711,20 @@ class _BottomBar extends StatelessWidget {
               );
             }),
           ),
-          ElevatedButton(
-            onPressed: onContinue,
-            child: Text(currentPage == totalPages - 1 ? 'Get started' : 'Continue'),
+          // Back + Continue buttons
+          Row(
+            children: [
+              if (currentPage > 0)
+                TextButton.icon(
+                  onPressed: onBack,
+                  icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                  label: const Text('Back'),
+                ).animate().fadeIn(),
+              ElevatedButton(
+                onPressed: onContinue,
+                child: Text(currentPage == totalPages - 1 ? 'Get started' : 'Continue'),
+              ),
+            ],
           ),
         ],
       ),

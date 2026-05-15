@@ -260,12 +260,20 @@ class SagaNotifier extends Notifier<SagaState> {
         };
       }
 
+      // language_count: number of distinct languages studied (partner signal).
+      final languageCount = state.xpByLanguage.values
+          .where((xp) => xp > 0)
+          .length;
+
       await Supabase.instance.client.from('users').update({
         'preferred_language': preferredLanguage,
         'engagement_tier':    tier,
         'learning_stage':     learningStage,
         'last_active_at':     DateTime.now().toUtc().toIso8601String(),
         'total_xp':           state.totalXp,
+        'streak_count':       state.streakCount,
+        // DataSteve: derived signals for partner exports
+        'language_count':     languageCount,
       }).eq('id', uid);
     } catch (e) {
       debugPrint('[SagaNotifier] profile enrichment failed: $e');

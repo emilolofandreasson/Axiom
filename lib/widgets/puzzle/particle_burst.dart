@@ -91,7 +91,7 @@ class _BurstPainter extends CustomPainter {
       canvas.drawCircle(
         Offset(x, y),
         r,
-        Paint()..color = p.color.withOpacity(opacity),
+        Paint()..color = p.color.withValues(alpha: opacity),
       );
     }
   }

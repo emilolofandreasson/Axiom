@@ -39,7 +39,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         children: _screens,
       ),
       bottomNavigationBar: NavigationBar(
-        backgroundColor:      FlickColors.surface,
+        backgroundColor:      FlickColors.background,
         indicatorColor:       FlickColors.primaryDim,
         selectedIndex:        _index,
         onDestinationSelected: (i) => setState(() => _index = i),

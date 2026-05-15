@@ -24,11 +24,14 @@ class _FriendsScreenState extends State<FriendsScreen>
   List<UserProfile>  _results  = [];
   bool _searchLoading = false;
 
+  List<UserProfile> _leaderboard = [];
+
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
+    _tabs = TabController(length: 4, vsync: this);
     _loadFriends();
+    _loadLeaderboard();
   }
 
   @override
@@ -43,6 +46,11 @@ class _FriendsScreenState extends State<FriendsScreen>
     if (mounted) setState(() => _friends = list);
   }
 
+  Future<void> _loadLeaderboard() async {
+    final list = await _friendService.leaderboard();
+    if (mounted) setState(() => _leaderboard = list);
+  }
+
   Future<void> _search(String q) async {
     if (q.trim().isEmpty) {
       setState(() => _results = []);
@@ -54,11 +62,13 @@ class _FriendsScreenState extends State<FriendsScreen>
   }
 
   Future<void> _sendRequest(UserProfile to) async {
-    await _friendService.sendRequest(to, widget.myProfile);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Request sent to ${to.name}')));
-    }
+    final ok = await _friendService.sendRequest(to, widget.myProfile);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(ok
+          ? 'Request sent to ${to.name.isNotEmpty ? to.name : 'user'} ✓'
+          : 'Could not send request — already sent or an error occurred.'),
+    ));
   }
 
   @override
@@ -71,6 +81,7 @@ class _FriendsScreenState extends State<FriendsScreen>
           controller: _tabs,
           tabs: const [
             Tab(text: 'Friends'),
+            Tab(text: 'Leaderboard'),
             Tab(text: 'Requests'),
             Tab(text: 'Find'),
           ],
@@ -83,6 +94,11 @@ class _FriendsScreenState extends State<FriendsScreen>
             friends:       _friends,
             friendService: _friendService,
             onRemoved:     _loadFriends,
+          ),
+          _LeaderboardTab(
+            entries:      _leaderboard,
+            myUid:        widget.myProfile.uid,
+            onRefresh:    _loadLeaderboard,
           ),
           _RequestsList(
             friendService: _friendService,
@@ -136,6 +152,126 @@ class _FriendsList extends StatelessWidget {
           child: const Text('Remove'),
         ),
       ).animate(delay: (i * 40).ms).fadeIn(),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+class _LeaderboardTab extends StatelessWidget {
+  const _LeaderboardTab({
+    required this.entries,
+    required this.myUid,
+    required this.onRefresh,
+  });
+
+  final List<UserProfile> entries;
+  final String            myUid;
+  final VoidCallback      onRefresh;
+
+  static const _medals = ['🥇', '🥈', '🥉'];
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('🏆', style: TextStyle(fontSize: 48)),
+            const SizedBox(height: 12),
+            Text('Add friends to see the leaderboard',
+                style: Theme.of(context).textTheme.bodyLarge!
+                    .copyWith(color: FlickColors.textSecondary),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            TextButton(onPressed: onRefresh, child: const Text('Refresh')),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async => onRefresh(),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(FlickSpacing.lg),
+        itemCount: entries.length,
+        itemBuilder: (_, i) {
+          final entry   = entries[i];
+          final isMe    = entry.uid == myUid;
+          final medal   = i < 3 ? _medals[i] : '${i + 1}.';
+          final name    = entry.name.isNotEmpty ? entry.name : 'Player';
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: FlickSpacing.sm),
+            padding: const EdgeInsets.symmetric(
+              horizontal: FlickSpacing.md,
+              vertical:   FlickSpacing.md - 2,
+            ),
+            decoration: BoxDecoration(
+              color: isMe
+                  ? FlickColors.primaryDim
+                  : FlickColors.surface,
+              borderRadius: const BorderRadius.all(FlickRadius.lg),
+              border: Border.all(
+                color: isMe ? FlickColors.primary : FlickColors.border,
+                width: isMe ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 32,
+                  child: Text(
+                    medal,
+                    style: const TextStyle(fontSize: 18),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(width: FlickSpacing.sm),
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: FlickColors.surfaceDim,
+                  backgroundImage: entry.photoUrl != null
+                      ? NetworkImage(entry.photoUrl!)
+                      : null,
+                  child: entry.photoUrl == null
+                      ? Text(name[0].toUpperCase(),
+                          style: const TextStyle(
+                              color: FlickColors.textSecondary,
+                              fontWeight: FontWeight.bold))
+                      : null,
+                ),
+                const SizedBox(width: FlickSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isMe ? '$name (you)' : name,
+                        style: Theme.of(context).textTheme.labelLarge!.copyWith(
+                              color: isMe
+                                  ? FlickColors.primary
+                                  : FlickColors.textPrimary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (entry.streakCount > 0)
+                        Text('🔥 ${entry.streakCount} day streak',
+                            style: Theme.of(context).textTheme.bodyMedium!
+                                .copyWith(color: FlickColors.textMuted)),
+                    ],
+                  ),
+                ),
+                Text(
+                  '${entry.totalXp} XP',
+                  style: Theme.of(context).textTheme.labelLarge!.copyWith(
+                        color: isMe ? FlickColors.primary : FlickColors.textSecondary),
+                ),
+              ],
+            ),
+          ).animate(delay: (i * 50).ms).fadeIn().slideX(begin: 0.04);
+        },
+      ),
     );
   }
 }

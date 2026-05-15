@@ -1,18 +1,21 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flick_sdk/flick_sdk.dart';
 import '../models/language_level.dart';
 import '../models/lesson.dart';
 import '../models/question.dart';
+import 'question_library_service.dart';
 
 // Thin alias kept for any legacy call sites.
 String cefrForXp(int xp) => cefrCodeForXp(xp);
 
 class LessonGenerator {
-  LessonGenerator({required this.bridge});
-  final EdgeAiBridge bridge;
+  LessonGenerator({required this.bridge, this.library});
 
-  // skill tags rotate in order; keeps content varied
+  final EdgeAiBridge           bridge;
+  final QuestionLibraryService? library;
+
   static const _skills = [
     'vocabulary/greetings',
     'vocabulary/numbers',
@@ -29,20 +32,36 @@ class LessonGenerator {
   Future<Lesson?> generate({
     required String languageCode,
     required String languageName,
-    required int userXp,
-    String? forceSkill,
+    required int    userXp,
+    String?         forceSkill,
   }) async {
-    final cefr = cefrCodeForXp(userXp);
-    final String skill;
-    if (forceSkill != null) {
-      skill = forceSkill;
-    } else {
-      // Offset by day so the daily lesson topic rotates each calendar day.
-      final dayOffset = DateTime.now().difference(DateTime(2025, 1, 1)).inDays;
-      skill = _skills[(dayOffset + _skillIndex) % _skills.length];
-      _skillIndex++;
+    final cefr  = cefrCodeForXp(userXp);
+    final skill = _resolveSkill(forceSkill);
+
+    // ── Cache-first: try global library before hitting Gemini ────────────────
+    if (library != null) {
+      final cached = await library!.fetchUnanswered(
+        languageCode: languageCode,
+        cefrLevel:    cefr,
+        skillTag:     skill,
+        limit:        4,
+      );
+      if (cached.length >= 4) {
+        debugPrint('[LessonGenerator] cache hit: ${cached.length} questions '
+            'from library ($languageCode/$cefr/$skill)');
+        return _lessonFromQuestions(
+          questions:    cached.take(4).toList(),
+          languageCode: languageCode,
+          cefr:         cefr,
+          skill:        skill,
+          userXp:       userXp,
+        );
+      }
+      debugPrint('[LessonGenerator] cache miss ($languageCode/$cefr/$skill), '
+          'calling Gemini');
     }
 
+    // ── Cache miss: generate from Gemini ────────────────────────────────────
     final prompt = _buildPrompt(
       languageCode: languageCode,
       languageName: languageName,
@@ -62,26 +81,52 @@ class LessonGenerator {
         return null;
       }
 
-      return _parse(result.text, languageCode, cefr, skill, userXp);
+      final rawList = _extractJsonList(result.text);
+      if (rawList == null) return null;
+
+      // Save the entire batch to the library (fire-and-forget, with UUID attach)
+      List<String> globalIds = [];
+      if (library != null) {
+        globalIds = await library!.saveQuestions(
+          rawQuestions: rawList,
+          languageCode: languageCode,
+          cefrLevel:    cefr,
+          skillTag:     skill,
+        );
+        debugPrint('[LessonGenerator] saved ${globalIds.length} questions to library');
+      }
+
+      return _parse(rawList, globalIds, languageCode, cefr, skill, userXp);
     } catch (e) {
       debugPrint('[LessonGenerator] error: $e');
       return null;
     }
   }
 
-  // Static portion of every lesson prompt — compiled once at class definition,
-  // never reallocated at runtime.
+  // ── Private helpers ────────────────────────────────────────────────────────
+
+  String _resolveSkill(String? forceSkill) {
+    if (forceSkill != null) return forceSkill;
+    final dayOffset =
+        DateTime.now().difference(DateTime(2025, 1, 1)).inDays;
+    final skill = _skills[(dayOffset + _skillIndex) % _skills.length];
+    _skillIndex++;
+    return skill;
+  }
+
   static const _promptSuffix =
       'Return ONLY a valid JSON array — no markdown fences, no explanation. '
       'Use this exact schema:\n'
       '[\n'
-      '  {"type":"multiple_choice","prompt":"...","options":["...","...","...","..."],"correct_index":0,"hint":null},\n'
-      '  {"type":"word_order","prompt":"Arrange into a correct sentence.","shuffled_words":["...","...","..."],"correct_order":[0,1,2]},\n'
-      '  {"type":"multiple_choice","prompt":"...","options":["...","...","...","..."],"correct_index":0,"hint":"..."},\n'
-      '  {"type":"multiple_choice","prompt":"...","options":["...","...","...","..."],"correct_index":0,"hint":null}\n'
+      '  {"type":"multiple_choice","prompt":"...","options":["wrong","wrong","correct","wrong"],"correct_index":2,"hint":null},\n'
+      '  {"type":"word_order","prompt":"Arrange into a correct sentence.","shuffled_words":["...","...","..."],"correct_order":[1,0,2]},\n'
+      '  {"type":"multiple_choice","prompt":"...","options":["wrong","correct","wrong","wrong"],"correct_index":1,"hint":"..."},\n'
+      '  {"type":"multiple_choice","prompt":"...","options":["correct","wrong","wrong","wrong"],"correct_index":0,"hint":null}\n'
       ']\n'
+      'CRITICAL: correct_index MUST vary across questions — never use the same index for all questions. '
+      'Place the correct answer at different positions (0, 1, 2 or 3) for each MC question. '
       'Rules: 3 multiple_choice + 1 word_order. '
-      'Correct answer for MC must always be at correct_index. '
+      'Correct answer for MC must always be at correct_index (0-based). '
       'shuffled_words for word_order: 3–6 words. '
       'correct_order = INTEGER INDICES (0-based positions in shuffled_words) in the correct sequence. '
       'Example: shuffled_words:["café","Yo","tomo"] correct_order:[1,2,0] NOT the words themselves. '
@@ -99,32 +144,51 @@ class LessonGenerator {
       'Keep difficulty appropriate for $cefr. '
       '$_promptSuffix';
 
-  Lesson? _parse(
-    String json,
-    String languageCode,
-    String cefr,
-    String skill,
-    int userXp,
-  ) {
+  List<Map<String, dynamic>>? _extractJsonList(String raw) {
     try {
-      // Strip any accidental markdown fences
-      final clean = json
+      final clean = raw
           .replaceAll(RegExp(r'```json\s*'), '')
           .replaceAll(RegExp(r'```\s*'), '')
           .trim();
+      return (jsonDecode(clean) as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('[LessonGenerator] JSON extract error: $e\nRaw: $raw');
+      return null;
+    }
+  }
 
-      final list = jsonDecode(clean) as List<dynamic>;
+  /// Parse a raw JSON list (from Gemini) into a Lesson.
+  /// [globalIds] are the UUIDs returned after saving to the library (may be empty).
+  Lesson? _parse(
+    List<Map<String, dynamic>> list,
+    List<String>               globalIds,
+    String languageCode,
+    String cefr,
+    String skill,
+    int    userXp,
+  ) {
+    try {
       final lessonId = 'ai-$languageCode-${DateTime.now().millisecondsSinceEpoch}';
       final questions = <Question>[];
 
       for (var i = 0; i < list.length; i++) {
-        final q = list[i] as Map<String, dynamic>;
-        final qId = 'q${i + 1}';
+        final q    = list[i];
+        final qId  = 'q${i + 1}';
         final type = q['type'] as String;
+        final gid  = i < globalIds.length ? globalIds[i] : null;
 
         if (type == 'multiple_choice') {
-          final options = (q['options'] as List).cast<String>();
-          final correct = (q['correct_index'] as num).toInt().clamp(0, options.length - 1);
+          var options = (q['options'] as List).cast<String>();
+          var correct = (q['correct_index'] as num)
+              .toInt()
+              .clamp(0, options.length - 1);
+
+          // Shuffle so correct answer isn't predictably at position 0.
+          final rng     = Random();
+          final indexed = options.asMap().entries.toList()..shuffle(rng);
+          options       = indexed.map((e) => e.value).toList();
+          correct       = indexed.indexWhere((e) => e.key == correct);
+
           questions.add(MultipleChoiceQuestion(
             id:           qId,
             lessonId:     lessonId,
@@ -134,28 +198,32 @@ class LessonGenerator {
             options:      options,
             correctIndex: correct,
             hintText:     q['hint'] as String?,
+            globalId:     gid,
           ));
+
         } else if (type == 'word_order') {
-          final words = (q['shuffled_words'] as List).cast<String>();
+          final words    = (q['shuffled_words'] as List).cast<String>();
           final rawOrder = q['correct_order'] as List;
-          // Gemini sometimes returns words instead of integer indices — handle both.
           var order = rawOrder.first is String
               ? rawOrder.cast<String>().map((w) {
                   final idx = words.indexOf(w);
                   return idx >= 0 ? idx : 0;
                 }).toList()
               : rawOrder.map((e) => (e as num).toInt()).toList();
-          // Guard: filter out any out-of-range indices to prevent RangeError.
-          order = order.where((idx) => idx >= 0 && idx < words.length).toList();
+          order = order
+              .where((idx) => idx >= 0 && idx < words.length)
+              .toList();
           if (order.isEmpty) continue;
           questions.add(WordOrderQuestion(
             id:            qId,
             lessonId:      lessonId,
             cefrLevel:     cefr,
             skillTag:      skill,
-            prompt:        q['prompt'] as String? ?? 'Arrange into a correct sentence.',
+            prompt:        q['prompt'] as String? ??
+                'Arrange into a correct sentence.',
             shuffledWords: words,
             correctOrder:  order,
+            globalId:      gid,
           ));
         }
       }
@@ -172,11 +240,36 @@ class LessonGenerator {
         questions:        questions,
         estimatedMinutes: 5,
         xpReward:         levelForXp(userXp).xpReward,
+        // isAiGenerated is derived from id.startsWith('ai-')
       );
     } catch (e) {
-      debugPrint('[LessonGenerator] parse error: $e\nRaw: $json');
+      debugPrint('[LessonGenerator] parse error: $e');
       return null;
     }
+  }
+
+  /// Build a lesson directly from library-fetched Question objects.
+  Lesson _lessonFromQuestions({
+    required List<Question> questions,
+    required String languageCode,
+    required String cefr,
+    required String skill,
+    required int    userXp,
+  }) {
+    // 'ai-lib-' prefix so isAiGenerated getter returns true for library lessons.
+    final lessonId = 'ai-lib-$languageCode-${DateTime.now().millisecondsSinceEpoch}';
+    return Lesson(
+      id:               lessonId,
+      title:            _titleFor(skill),
+      description:      _descFor(skill, languageCode),
+      courseLanguage:   languageCode,
+      cefrLevel:        cefr,
+      skillTag:         skill,
+      questions:        questions,
+      estimatedMinutes: 5,
+      xpReward:         levelForXp(userXp).xpReward,
+      // isAiGenerated is derived from id.startsWith('ai-')
+    );
   }
 
   String _titleFor(String skill) => switch (skill) {
@@ -202,6 +295,4 @@ class LessonGenerator {
     'conversation/questions'     => 'Ask and answer questions in $lang.',
     _                            => 'Practise your $lang skills.',
   };
-
-  // XP reward now comes from levelForXp(userXp).xpReward in _parse().
 }

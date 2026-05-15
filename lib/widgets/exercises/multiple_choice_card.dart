@@ -122,61 +122,68 @@ class _OptionTile extends StatelessWidget {
                               FlickColors.error,        FlickColors.error),
     };
 
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: 220.ms,
-        padding: const EdgeInsets.symmetric(
-          horizontal: FlickSpacing.md,
-          vertical: FlickSpacing.md - 2,
-        ),
-        decoration: BoxDecoration(
-          color:        bg,
-          borderRadius: const BorderRadius.all(FlickRadius.lg),
-          border:       Border.all(color: border, width: 1.5),
-        ),
-        child: Row(
-          children: [
-            // Letter badge
-            AnimatedContainer(
-              duration: 200.ms,
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color:        badgeBg,
-                borderRadius: const BorderRadius.all(FlickRadius.sm),
+    return Semantics(
+      label: 'Option ${_letters[index]}: $label',
+      button: state == _TileState.idle,
+      selected: state == _TileState.selected || state == _TileState.correct,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: 220.ms,
+          padding: const EdgeInsets.symmetric(
+            horizontal: FlickSpacing.md,
+            vertical: FlickSpacing.md - 2,
+          ),
+          decoration: BoxDecoration(
+            color:        bg,
+            borderRadius: const BorderRadius.all(FlickRadius.lg),
+            border:       Border.all(color: border, width: 1.5),
+          ),
+          child: Row(
+            children: [
+              // Letter badge
+              AnimatedContainer(
+                duration: 200.ms,
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color:        badgeBg,
+                  borderRadius: const BorderRadius.all(FlickRadius.sm),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  _letters[index],
+                  style: Theme.of(context).textTheme.labelLarge!.copyWith(
+                        color: state == _TileState.idle
+                            ? FlickColors.textSecondary
+                            : Colors.white,
+                        fontSize: 13,
+                      ),
+                ),
               ),
-              alignment: Alignment.center,
-              child: Text(
-                _letters[index],
-                style: Theme.of(context).textTheme.labelLarge!.copyWith(
-                      color: state == _TileState.idle
-                          ? FlickColors.textSecondary
-                          : Colors.white,
-                      fontSize: 13,
-                    ),
+
+              const SizedBox(width: FlickSpacing.md),
+
+              Expanded(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                  style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                        color: fg,
+                        fontWeight: state != _TileState.idle
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
+                ),
               ),
-            ),
 
-            const SizedBox(width: FlickSpacing.md),
-
-            Expanded(
-              child: Text(
-                label,
-                style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                      color: fg,
-                      fontWeight: state != _TileState.idle
-                          ? FontWeight.w600
-                          : FontWeight.w400,
-                    ),
-              ),
-            ),
-
-            if (state == _TileState.correct)
-              const Icon(Icons.check_rounded, color: FlickColors.success, size: 20),
-            if (state == _TileState.wrong)
-              const Icon(Icons.close_rounded, color: FlickColors.error, size: 20),
-          ],
+              if (state == _TileState.correct)
+                const Icon(Icons.check_rounded, color: FlickColors.success, size: 20),
+              if (state == _TileState.wrong)
+                const Icon(Icons.close_rounded, color: FlickColors.error, size: 20),
+            ],
+          ),
         ),
       ),
     )
@@ -200,38 +207,45 @@ class _HintChipState extends State<_HintChip> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: _revealed ? null : () {
-        setState(() => _revealed = true);
-        EventSensor.instance.emit('hint_viewed', {
-          'question_id': widget.questionId,
-        });
-      },
-      child: AnimatedContainer(
-        duration: 300.ms,
-        padding: const EdgeInsets.symmetric(
-          horizontal: FlickSpacing.md,
-          vertical: FlickSpacing.sm,
-        ),
-        decoration: BoxDecoration(
-          color:        FlickColors.surfaceDim,
-          borderRadius: const BorderRadius.all(FlickRadius.full),
-          border:       Border.all(color: FlickColors.border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.lightbulb_outline_rounded,
-                size: 14, color: FlickColors.warning),
-            const SizedBox(width: FlickSpacing.xs),
-            Text(
-              _revealed ? widget.text : 'Show hint',
-              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                    color: _revealed ? FlickColors.textPrimary : FlickColors.textMuted,
-                    fontStyle: _revealed ? FontStyle.italic : FontStyle.normal,
-                  ),
+    return Semantics(
+      label: _revealed ? 'Hint: ${widget.text}' : 'Show hint',
+      button: !_revealed,
+      child: GestureDetector(
+        onTap: _revealed ? null : () {
+          setState(() => _revealed = true);
+          EventSensor.instance.emit('hint_viewed', {
+            'question_id': widget.questionId,
+          });
+        },
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+          child: AnimatedContainer(
+            duration: 300.ms,
+            padding: const EdgeInsets.symmetric(
+              horizontal: FlickSpacing.md,
+              vertical: FlickSpacing.sm,
             ),
-          ],
+            decoration: BoxDecoration(
+              color:        FlickColors.surfaceDim,
+              borderRadius: const BorderRadius.all(FlickRadius.full),
+              border:       Border.all(color: FlickColors.border),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.lightbulb_outline_rounded,
+                    size: 14, color: FlickColors.warning),
+                const SizedBox(width: FlickSpacing.xs),
+                Text(
+                  _revealed ? widget.text : 'Show hint',
+                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                        color: _revealed ? FlickColors.textPrimary : FlickColors.textMuted,
+                        fontStyle: _revealed ? FontStyle.italic : FontStyle.normal,
+                      ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

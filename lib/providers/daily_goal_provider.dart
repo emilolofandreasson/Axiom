@@ -1,19 +1,27 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const kDailyXpGoal = 20;
+const kDefaultDailyXpGoal = 20;
+const kDailyXpGoal        = kDefaultDailyXpGoal; // kept for back-compat reads
 
 class DailyGoalState {
-  const DailyGoalState({this.xpToday = 0, this.goalMet = false});
+  const DailyGoalState({
+    this.xpToday = 0,
+    this.goalXp  = kDefaultDailyXpGoal,
+    this.goalMet = false,
+  });
+
   final int  xpToday;
+  final int  goalXp;
   final bool goalMet;
 
-  double get progress => (xpToday / kDailyXpGoal).clamp(0.0, 1.0);
+  double get progress => goalXp == 0 ? 0.0 : (xpToday / goalXp).clamp(0.0, 1.0);
 }
 
 class DailyGoalNotifier extends Notifier<DailyGoalState> {
   static const _kXpToday = 'daily_xp_today';
   static const _kDate    = 'daily_xp_date';
+  static const _kGoal    = 'daily_xp_goal';
 
   @override
   DailyGoalState build() {
@@ -25,15 +33,15 @@ class DailyGoalNotifier extends Notifier<DailyGoalState> {
     final prefs     = await SharedPreferences.getInstance();
     final today     = _todayKey();
     final savedDate = prefs.getString(_kDate);
+    final goalXp    = prefs.getInt(_kGoal) ?? kDefaultDailyXpGoal;
 
     if (savedDate != today) {
-      // New day — reset
       await prefs.setInt(_kXpToday, 0);
       await prefs.setString(_kDate, today);
-      state = const DailyGoalState();
+      state = DailyGoalState(goalXp: goalXp);
     } else {
       final xp = prefs.getInt(_kXpToday) ?? 0;
-      state = DailyGoalState(xpToday: xp, goalMet: xp >= kDailyXpGoal);
+      state = DailyGoalState(xpToday: xp, goalXp: goalXp, goalMet: xp >= goalXp);
     }
   }
 
@@ -45,7 +53,18 @@ class DailyGoalNotifier extends Notifier<DailyGoalState> {
     await prefs.setInt(_kXpToday, newXp);
     state = DailyGoalState(
       xpToday: newXp,
-      goalMet: newXp >= kDailyXpGoal,
+      goalXp:  state.goalXp,
+      goalMet: newXp >= state.goalXp,
+    );
+  }
+
+  Future<void> setGoal(int goalXp) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_kGoal, goalXp);
+    state = DailyGoalState(
+      xpToday: state.xpToday,
+      goalXp:  goalXp,
+      goalMet: state.xpToday >= goalXp,
     );
   }
 

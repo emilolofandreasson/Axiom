@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/theme/app_theme.dart';
 import '../models/language.dart';
 import '../models/lesson.dart';
 import '../models/puzzle_level.dart';
 import '../models/language_level.dart';
+import '../main.dart' show authService;
+import '../models/user_profile.dart';
 import '../providers/daily_goal_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/lesson_provider.dart';
+import '../providers/review_provider.dart';
 import '../providers/saga_provider.dart';
+import '../services/friend_service.dart';
 import 'ai_practice_screen.dart';
 import 'daily_lesson_screen.dart';
+import 'friends_screen.dart';
 import 'language_picker_screen.dart';
+import 'review_screen.dart';
 import 'saga_map_screen.dart';
 import 'profile_screen.dart';
 
@@ -60,6 +67,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final lessonState = ref.watch(lessonProvider);
     final sagaState   = ref.watch(sagaProvider);
     final dailyGoal   = ref.watch(dailyGoalProvider);
+    final reviewItems = ref.watch(reviewProvider);
     final word        = _wordOfDay(language.code);
     final lessons     = kLessonsByLanguage[language.code] ?? kLessonsByLanguage['es']!;
 
@@ -107,18 +115,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
               const SizedBox(height: FlickSpacing.md),
 
-              Row(
-                children: [
-                  _StatPill(icon: '🔥', label: '${sagaState.streakCount} day streak'),
-                  const SizedBox(width: FlickSpacing.sm),
-                  _StatPill(icon: '⚡', label: '${sagaState.xpForLanguage(language.code)} XP'),
-                  const SizedBox(width: FlickSpacing.sm),
-                  _StatPill(
-                    icon: '🎓',
-                    label: levelLabelForXp(sagaState.xpForLanguage(language.code)),
-                  ),
-                ],
-              ).animate().fadeIn(delay: 80.ms, duration: 300.ms),
+              Builder(builder: (context) {
+                final langXp = sagaState.xpForLanguage(language.code);
+                return Row(
+                  children: [
+                    _StatPill(icon: '🔥', label: '${sagaState.streakCount} day streak'),
+                    if (langXp > 0) ...[
+                      const SizedBox(width: FlickSpacing.sm),
+                      _StatPill(icon: '⚡', label: '$langXp XP'),
+                      const SizedBox(width: FlickSpacing.sm),
+                      _StatPill(
+                        icon: '🎓',
+                        label: levelLabelForXp(langXp),
+                      ),
+                    ],
+                  ],
+                );
+              }).animate().fadeIn(delay: 80.ms, duration: 300.ms),
 
               const SizedBox(height: FlickSpacing.md),
 
@@ -134,6 +147,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ).animate().fadeIn(delay: 160.ms, duration: 300.ms),
 
               const SizedBox(height: FlickSpacing.md),
+
+              if (reviewItems.isNotEmpty)
+                _ReviewCard(count: reviewItems.length)
+                    .animate()
+                    .fadeIn(delay: 220.ms, duration: 300.ms),
+
+              if (reviewItems.isNotEmpty)
+                const SizedBox(height: FlickSpacing.md),
 
               _PuzzlePathCard()
                   .animate()
@@ -151,6 +172,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     .animate()
                     .fadeIn(delay: 320.ms, duration: 300.ms),
               ],
+
+              const SizedBox(height: FlickSpacing.md),
+
+              _FriendLeaderboardCard(myUid: authService.currentUser?.id ?? '')
+                  .animate()
+                  .fadeIn(delay: 360.ms, duration: 300.ms),
 
               const SizedBox(height: FlickSpacing.lg),
             ],
@@ -321,14 +348,17 @@ class _DailyLessonCard extends StatelessWidget {
     final generating = lessonState.isGenerating;
     final failed     = lessonState.lastGenerationFailed;
 
-    return GestureDetector(
-      onTap: hasContent && !generating
-          ? () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DailyLessonScreen()),
-              )
-          : null,
-      child: Container(
+    return Semantics(
+      label: hasContent ? 'Daily Lesson: ${lessonState.lesson.title}' : 'Daily Lesson',
+      button: hasContent && !generating,
+      child: GestureDetector(
+        onTap: hasContent && !generating
+            ? () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DailyLessonScreen()),
+                )
+            : null,
+        child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(FlickSpacing.lg),
         decoration: BoxDecoration(
@@ -410,6 +440,7 @@ class _DailyLessonCard extends StatelessWidget {
                   ),
                 ],
               ),
+      ),
       ),
     );
   }
@@ -513,16 +544,79 @@ class _MiniChip extends StatelessWidget {
   }
 }
 
+class _ReviewCard extends StatelessWidget {
+  const _ReviewCard({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Review: $count words to practice',
+      button: true,
+      child: GestureDetector(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ReviewScreen()),
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(FlickSpacing.lg),
+          decoration: BoxDecoration(
+            color:        FlickColors.surface,
+            borderRadius: const BorderRadius.all(FlickRadius.lg),
+            border:       Border.all(
+                color: FlickColors.warning.withValues(alpha: 0.5), width: 1.5),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44, height: 44,
+                decoration: BoxDecoration(
+                  color:        FlickColors.warning.withValues(alpha: 0.15),
+                  borderRadius: const BorderRadius.all(FlickRadius.md),
+                ),
+                child: const Icon(Icons.refresh_rounded,
+                    color: FlickColors.warning, size: 22),
+              ),
+              const SizedBox(width: FlickSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Review mistakes',
+                        style: Theme.of(context).textTheme.headlineSmall),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$count word${count == 1 ? '' : 's'} waiting for review',
+                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                            color: FlickColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_rounded,
+                  color: FlickColors.warning),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _PuzzlePathCard extends StatelessWidget {
   const _PuzzlePathCard();
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const SagaMapScreen()),
-      ),
+    return Semantics(
+      label: 'Puzzle Path — Match words, build vocabulary',
+      button: true,
+      child: GestureDetector(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SagaMapScreen()),
+        ),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(FlickSpacing.lg),
@@ -549,20 +643,44 @@ class _PuzzlePathCard extends StatelessWidget {
           ],
         ),
       ),
+      ),
     );
   }
 }
 
-class _AiPracticeCard extends StatelessWidget {
+class _AiPracticeCard extends StatefulWidget {
   const _AiPracticeCard();
+
+  @override
+  State<_AiPracticeCard> createState() => _AiPracticeCardState();
+}
+
+class _AiPracticeCardState extends State<_AiPracticeCard> {
+  static const _kPrefsKey = 'ai_practice_used';
+  bool _isNew = true;
+
+  @override
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((p) {
+      if (mounted) setState(() => _isNew = !(p.getBool(_kPrefsKey) ?? false));
+    });
+  }
+
+  Future<void> _onTap() async {
+    if (_isNew) {
+      final p = await SharedPreferences.getInstance();
+      await p.setBool(_kPrefsKey, true);
+      if (mounted) setState(() => _isNew = false);
+    }
+    if (!mounted) return;
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const AiPracticeScreen()));
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const AiPracticeScreen()),
-      ),
+      onTap: _onTap,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(FlickSpacing.lg),
@@ -599,24 +717,26 @@ class _AiPracticeCard extends StatelessWidget {
                     children: [
                       Text('AI Practice',
                           style: Theme.of(context).textTheme.headlineSmall),
-                      const SizedBox(width: FlickSpacing.xs),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: FlickColors.primary,
-                          borderRadius:
-                              const BorderRadius.all(FlickRadius.full),
+                      if (_isNew) ...[
+                        const SizedBox(width: FlickSpacing.xs),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: FlickColors.primary,
+                            borderRadius:
+                                const BorderRadius.all(FlickRadius.full),
+                          ),
+                          child: Text('NEW',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall!
+                                  .copyWith(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      letterSpacing: 0.5)),
                         ),
-                        child: Text('NEW',
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall!
-                                .copyWith(
-                                    color: Colors.white,
-                                    fontSize: 9,
-                                    letterSpacing: 0.5)),
-                      ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -640,50 +760,232 @@ class _WordOfDayCard extends StatelessWidget {
   final WordPair word;
   final Language language;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(FlickSpacing.lg),
-      decoration: BoxDecoration(
-        color:        FlickColors.primaryDim,
-        borderRadius: const BorderRadius.all(FlickRadius.lg),
-        border:       Border.all(color: FlickColors.primary.withValues(alpha: 0.2)),
+  void _showDetail(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: FlickColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: FlickRadius.xl),
       ),
-      child: Row(
-        children: [
-          const Text('✨', style: TextStyle(fontSize: 22)),
-          const SizedBox(width: FlickSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'WORD OF THE DAY',
-                  style: Theme.of(context).textTheme.labelSmall!.copyWith(
-                        color: FlickColors.primary, letterSpacing: 1.2),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(FlickSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: FlickColors.border,
+                  borderRadius: const BorderRadius.all(FlickRadius.full),
                 ),
-                const SizedBox(height: 4),
-                RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: word.targetWord,
-                        style: Theme.of(context).textTheme.labelLarge!.copyWith(
-                              color: FlickColors.primary),
-                      ),
-                      TextSpan(
-                        text: '  —  ${word.sourceWord}',
-                        style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                              color: FlickColors.textSecondary),
-                      ),
-                    ],
-                  ),
+              ),
+            ),
+            const SizedBox(height: FlickSpacing.lg),
+            Text(
+              'WORD OF THE DAY',
+              style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                    color: FlickColors.primary, letterSpacing: 1.2),
+            ),
+            const SizedBox(height: FlickSpacing.md),
+            Text(
+              word.targetWord,
+              style: Theme.of(context).textTheme.displaySmall!.copyWith(
+                    color: FlickColors.primary),
+            ),
+            const SizedBox(height: FlickSpacing.sm),
+            Row(
+              children: [
+                Text(language.flag, style: const TextStyle(fontSize: 20)),
+                const SizedBox(width: FlickSpacing.sm),
+                Text(
+                  language.name,
+                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                        color: FlickColors.textMuted),
                 ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: FlickSpacing.lg),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(FlickSpacing.md),
+              decoration: BoxDecoration(
+                color: FlickColors.surfaceDim,
+                borderRadius: const BorderRadius.all(FlickRadius.md),
+                border: Border.all(color: FlickColors.border),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.translate_rounded,
+                      size: 18, color: FlickColors.textMuted),
+                  const SizedBox(width: FlickSpacing.sm),
+                  Text(
+                    word.sourceWord,
+                    style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                          color: FlickColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: FlickSpacing.xl),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _showDetail(context),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(FlickSpacing.lg),
+        decoration: BoxDecoration(
+          color:        FlickColors.primaryDim,
+          borderRadius: const BorderRadius.all(FlickRadius.lg),
+          border:       Border.all(color: FlickColors.primary.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: [
+            const Text('✨', style: TextStyle(fontSize: 22)),
+            const SizedBox(width: FlickSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'WORD OF THE DAY',
+                    style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                          color: FlickColors.primary, letterSpacing: 1.2),
+                  ),
+                  const SizedBox(height: 4),
+                  RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: word.targetWord,
+                          style: Theme.of(context).textTheme.labelLarge!.copyWith(
+                                color: FlickColors.primary),
+                        ),
+                        TextSpan(
+                          text: '  —  ${word.sourceWord}',
+                          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                                color: FlickColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded,
+                color: FlickColors.primary, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Friend leaderboard preview card
+// ---------------------------------------------------------------------------
+
+class _FriendLeaderboardCard extends StatefulWidget {
+  const _FriendLeaderboardCard({required this.myUid});
+  final String myUid;
+
+  @override
+  State<_FriendLeaderboardCard> createState() => _FriendLeaderboardCardState();
+}
+
+class _FriendLeaderboardCardState extends State<_FriendLeaderboardCard> {
+  List<UserProfile> _entries = [];
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    FriendService().leaderboard().then((list) {
+      if (mounted) setState(() { _entries = list; _loaded = true; });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loaded && _entries.length <= 1) return const SizedBox.shrink();
+
+    final preview = _entries.take(3).toList();
+
+    return GestureDetector(
+      onTap: () {
+        final profile = UserProfile(uid: widget.myUid);
+        Navigator.push(context, MaterialPageRoute(
+            builder: (_) => FriendsScreen(myProfile: profile)));
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(FlickSpacing.md),
+        decoration: BoxDecoration(
+          color:        FlickColors.surface,
+          borderRadius: const BorderRadius.all(FlickRadius.lg),
+          border:       Border.all(color: FlickColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('FRIEND LEADERBOARD',
+                    style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                        color: FlickColors.textMuted, letterSpacing: 1.2)),
+                const Spacer(),
+                const Icon(Icons.arrow_forward_rounded,
+                    size: 14, color: FlickColors.textMuted),
+              ],
+            ),
+            const SizedBox(height: FlickSpacing.sm),
+            if (!_loaded)
+              const LinearProgressIndicator()
+            else
+              ...preview.asMap().entries.map((e) {
+                final rank  = e.key + 1;
+                final entry = e.value;
+                final isMe  = entry.uid == widget.myUid;
+                final name  = entry.name.isNotEmpty ? entry.name : 'Player';
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        child: Text('$rank.',
+                            style: Theme.of(context).textTheme.labelSmall!
+                                .copyWith(color: FlickColors.textMuted)),
+                      ),
+                      const SizedBox(width: FlickSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          isMe ? '$name (you)' : name,
+                          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                              fontWeight: isMe ? FontWeight.w600 : FontWeight.normal,
+                              color: isMe
+                                  ? FlickColors.primary
+                                  : FlickColors.textPrimary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text('${entry.totalXp} XP',
+                          style: Theme.of(context).textTheme.labelSmall!
+                              .copyWith(color: FlickColors.textSecondary)),
+                    ],
+                  ),
+                );
+              }),
+          ],
+        ),
       ),
     );
   }

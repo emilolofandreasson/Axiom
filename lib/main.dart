@@ -16,14 +16,18 @@ import 'services/api_key_service.dart';
 import 'services/auth_service.dart';
 import 'services/supabase_sync_service.dart';
 import 'services/lesson_generator.dart';
+import 'services/puzzle_generator_service.dart';
+import 'services/question_library_service.dart';
 
-final authService   = AuthService(hmacSalt: Env.hmacSalt);
-final apiKeyService = ApiKeyService();
-bool onboardingDone = false;
+final authService       = AuthService(hmacSalt: Env.hmacSalt);
+final apiKeyService     = ApiKeyService();
+final questionLibrary   = QuestionLibraryService();
+bool onboardingDone     = false;
 DateTime _sessionStartedAt = DateTime.now();
 
 // Non-final — updated by ApiKeyService when user saves/removes their key.
-late LessonGenerator lessonGenerator;
+late LessonGenerator        lessonGenerator;
+late PuzzleGeneratorService puzzleGenerator;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,9 +45,12 @@ Future<void> main() async {
   if (proxy != null) {
     final bridge = GeminiBridge(apiKey: '', proxyUrl: proxy);
     await bridge.loadModel('');
-    lessonGenerator = LessonGenerator(bridge: bridge);
+    lessonGenerator  = LessonGenerator(bridge: bridge, library: questionLibrary);
+    puzzleGenerator  = PuzzleGeneratorService(bridge: bridge);
   } else {
-    lessonGenerator = LessonGenerator(bridge: StubEdgeAiBridge());
+    final stub       = StubEdgeAiBridge();
+    lessonGenerator  = LessonGenerator(bridge: stub, library: questionLibrary);
+    puzzleGenerator  = PuzzleGeneratorService(bridge: stub);
   }
 
   // 1. Override with user's saved key from device storage (higher priority).
@@ -56,9 +63,10 @@ Future<void> main() async {
 
   // 3. Override with compile-time key if explicitly provided.
   if (Env.geminiApiKey.isNotEmpty) {
-    final bridge = GeminiBridge(apiKey: Env.geminiApiKey, proxyUrl: proxy);
+    final bridge     = GeminiBridge(apiKey: Env.geminiApiKey, proxyUrl: proxy);
     await bridge.loadModel('');
-    lessonGenerator = LessonGenerator(bridge: bridge);
+    lessonGenerator  = LessonGenerator(bridge: bridge, library: questionLibrary);
+    puzzleGenerator  = PuzzleGeneratorService(bridge: bridge);
   }
 
   final prefs = await SharedPreferences.getInstance();

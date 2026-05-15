@@ -60,12 +60,12 @@ class ProfileService {
   Future<String?> _uploadAvatar(String uid, Uint8List bytes) async {
     try {
       final path = '$uid/avatar.jpg';
-      await _db.storage.from('axiom').uploadBinary(
+      await _db.storage.from('Axiom').uploadBinary(
         path,
         bytes,
         fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true),
       );
-      final url = _db.storage.from('axiom').getPublicUrl(path);
+      final url = _db.storage.from('Axiom').getPublicUrl(path);
       await _db.from('users').update({'photo_url': url}).eq('id', uid);
       return url;
     } catch (e) {

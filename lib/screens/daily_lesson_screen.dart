@@ -22,11 +22,14 @@ class DailyLessonScreen extends ConsumerWidget {
     // Route to completion screen when done.
     if (state.status == LessonStatus.completed) {
       return LessonCompleteScreen(
-        correctCount:  state.correctCount,
-        totalCount:    state.totalQuestions,
-        xpEarned:      state.lesson.xpReward,
-        onContinue:    () => notifier.nextLesson(),
-        wrongAnswers:  state.results
+        correctCount:   state.correctCount,
+        totalCount:     state.totalQuestions,
+        xpEarned:       state.lesson.xpReward,
+        newStreak:      state.newStreak,
+        prevLevelLabel: state.prevLevelLabel,
+        newLevelLabel:  state.newLevelLabel,
+        onContinue:     () => notifier.nextLesson(),
+        wrongAnswers:   state.results
             .where((r) => r.answerState == AnswerState.wrong)
             .toList(),
       );
@@ -81,7 +84,7 @@ class DailyLessonScreen extends ConsumerWidget {
               // Exercise body
               Expanded(
                 child: _ExerciseBody(
-                  key:      ValueKey(state.currentQuestion.id),
+                  key:      ValueKey('${state.lesson.id}_${state.currentIndex}'),
                   state:    state,
                   notifier: notifier,
                 ),
@@ -147,7 +150,7 @@ class _LessonAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final VoidCallback onClose;
 
   @override
-  Size get preferredSize => const Size.fromHeight(72);
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 28);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -256,7 +259,7 @@ class _Badge extends StatelessWidget {
         vertical: 3,
       ),
       decoration: BoxDecoration(
-        color:        color.withOpacity(0.1),
+        color:        color.withValues(alpha: 0.1),
         borderRadius: const BorderRadius.all(FlickRadius.full),
       ),
       child: Text(
@@ -297,8 +300,10 @@ class _ExerciseBody extends ConsumerWidget {
           onAnswer:    notifier.submitAnswer,
         ),
       SpeakingQuestion sp => AIChatPanel(
-          question:   sp,
-          onComplete: notifier.advance,
+          question:     sp,
+          onComplete:   notifier.advance,
+          cefrLevel:    state.lesson.cefrLevel,
+          languageName: state.lesson.courseLanguage,
         ),
     };
   }

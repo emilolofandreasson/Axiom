@@ -131,8 +131,12 @@ class _SagaMapScreenState extends ConsumerState<SagaMapScreen> {
 
             if (saga.revealPowerups > 0) const SizedBox(height: FlickSpacing.lg),
 
-            // Level nodes with path connectors
+            // Level nodes with world banners and path connectors
             for (int i = 0; i < levels.length; i++) ...[
+              // Inject world banner when CEFR level changes
+              if (i == 0 || levels[i].cefrLevel != levels[i - 1].cefrLevel)
+                _WorldBanner(cefrLevel: levels[i].cefrLevel, index: i),
+
               _LevelNode(
                 level:      levels[i],
                 isUnlocked: saga.isUnlocked(levels[i]),
@@ -337,8 +341,94 @@ class _PowerupBanner extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Level node — alternates left/right for winding-path feel
+// World banner — shown when CEFR level changes in the path
 // ---------------------------------------------------------------------------
+
+class _WorldBanner extends StatelessWidget {
+  const _WorldBanner({required this.cefrLevel, required this.index});
+
+  final String cefrLevel;
+  final int    index;
+
+  static const _worlds = {
+    'A1': (emoji: '🌱', name: 'Beginner Plaza',     colors: [Color(0xFF43A047), Color(0xFFAED581)]),
+    'A2': (emoji: '🌱', name: 'Beginner Plaza',     colors: [Color(0xFF43A047), Color(0xFFAED581)]),
+    'B1': (emoji: '📚', name: 'Language Library',   colors: [Color(0xFF1976D2), Color(0xFF64B5F6)]),
+    'B2': (emoji: '📚', name: 'Language Library',   colors: [Color(0xFF1976D2), Color(0xFF64B5F6)]),
+    'C1': (emoji: '🎓', name: "Master's University",colors: [Color(0xFF6A1B9A), Color(0xFFCE93D8)]),
+    'C2': (emoji: '🎓', name: "Master's University",colors: [Color(0xFF6A1B9A), Color(0xFFCE93D8)]),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final world = _worlds[cefrLevel] ??
+        (emoji: '⭐', name: 'New World', colors: const [Color(0xFF546E7A), Color(0xFF90A4AE)]);
+
+    return Padding(
+      padding: EdgeInsets.only(
+        top: index == 0 ? 0 : FlickSpacing.xl,
+        bottom: FlickSpacing.lg,
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+          vertical: FlickSpacing.md,
+          horizontal: FlickSpacing.lg,
+        ),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: world.colors,
+            begin: Alignment.centerLeft,
+            end:   Alignment.centerRight,
+          ),
+          borderRadius: const BorderRadius.all(FlickRadius.xl),
+        ),
+        child: Row(
+          children: [
+            Text(world.emoji, style: const TextStyle(fontSize: 28)),
+            const SizedBox(width: FlickSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    world.name,
+                    style: const TextStyle(
+                      color:      Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize:   16,
+                    ),
+                  ),
+                  Text(
+                    cefrLevel,
+                    style: const TextStyle(
+                      color:   Colors.white70,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    )
+        .animate(delay: Duration(milliseconds: index * 40))
+        .fadeIn(duration: 350.ms)
+        .slideY(begin: -0.06, end: 0, curve: Curves.easeOut);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Level node — Candy Crush-style circular node with stars + avatar
+// ---------------------------------------------------------------------------
+
+int _starCount(bool isComplete, int retries) {
+  if (!isComplete) return 0;
+  if (retries == 0) return 3;
+  if (retries <= 2) return 2;
+  return 1;
+}
 
 class _LevelNode extends StatelessWidget {
   const _LevelNode({
@@ -351,149 +441,154 @@ class _LevelNode extends StatelessWidget {
     required this.onTap,
   });
 
-  final PuzzleLevel level;
-  final bool isUnlocked;
-  final bool isComplete;
-  final bool isCurrent;
-  final int retries;
-  final int index;
-  final VoidCallback? onTap;
+  final PuzzleLevel    level;
+  final bool           isUnlocked;
+  final bool           isComplete;
+  final bool           isCurrent;
+  final int            retries;
+  final int            index;
+  final VoidCallback?  onTap;
+
+  Color get _circleColor {
+    if (isComplete)   return FlickColors.success;
+    if (isUnlocked)   return FlickColors.primary;
+    return FlickColors.surfaceDim;
+  }
 
   @override
   Widget build(BuildContext context) {
     final isLeft = index.isEven;
+    final stars  = _starCount(isComplete, retries);
 
-    final card = GestureDetector(
+    Widget circle = GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        width: 210,
-        padding: const EdgeInsets.all(FlickSpacing.md),
+        duration: 300.ms,
+        width:  64,
+        height: 64,
         decoration: BoxDecoration(
-          color: isComplete
-              ? FlickColors.successDim
-              : isUnlocked
-                  ? FlickColors.surface
-                  : FlickColors.surfaceDim,
-          borderRadius: const BorderRadius.all(FlickRadius.xl),
-          border: Border.all(
-            color: isCurrent
-                ? FlickColors.primary
-                : isComplete
-                    ? FlickColors.success
-                    : isUnlocked
-                        ? FlickColors.border
-                        : FlickColors.border.withValues(alpha: 0.4),
-            width: isCurrent || isComplete ? 2 : 1,
-          ),
+          color:  _circleColor,
+          shape:  BoxShape.circle,
           boxShadow: isCurrent
-              ? [
-                  BoxShadow(
-                    color:      FlickColors.primary.withValues(alpha: 0.28),
-                    blurRadius: 20,
-                    spreadRadius: 1,
-                    offset:     const Offset(0, 4),
-                  )
-                ]
-              : isUnlocked && !isComplete
-                  ? [
-                      BoxShadow(
-                        color:      FlickColors.primary.withValues(alpha: 0.07),
-                        blurRadius: 16,
-                        offset:     const Offset(0, 4),
-                      )
-                    ]
+              ? [BoxShadow(
+                  color:      FlickColors.primary.withValues(alpha: 0.4),
+                  blurRadius: 20,
+                  spreadRadius: 4,
+                )]
+              : isComplete
+                  ? [BoxShadow(
+                      color:      FlickColors.success.withValues(alpha: 0.25),
+                      blurRadius: 12,
+                    )]
                   : null,
         ),
-        child: Row(
-          children: [
-            // Badge circle
-            Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                color: isComplete
-                    ? FlickColors.success
-                    : isUnlocked
-                        ? FlickColors.primary
-                        : FlickColors.surfaceDim,
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: isComplete
-                    ? const Icon(Icons.check_rounded,
-                          size: 20, color: Colors.white)
-                    : isUnlocked
-                        ? Text(
-                            '${level.levelNumber}',
-                            style: const TextStyle(
-                              color:      Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize:   15,
-                            ),
-                          )
-                        : const Icon(Icons.lock_rounded,
-                              size: 16, color: FlickColors.textMuted),
-              ),
-            ),
-
-            const SizedBox(width: FlickSpacing.sm),
-
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    level.title,
-                    style: Theme.of(context).textTheme.labelLarge!.copyWith(
-                          color: isUnlocked
-                              ? FlickColors.textPrimary
-                              : FlickColors.textMuted,
-                        ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${level.cefrLevel}  ·  ${level.xpReward} XP',
-                    style: Theme.of(context)
-                        .textTheme
-                        .labelSmall!
-                        .copyWith(color: FlickColors.textMuted),
-                  ),
-                  if (retries > 0 && isComplete)
-                    Text(
-                      '$retries ${retries == 1 ? "retry" : "retries"}',
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelSmall!
-                          .copyWith(color: FlickColors.textMuted),
-                    ),
-                ],
-              ),
-            ),
-
-            if (isUnlocked && !isComplete)
-              const Icon(Icons.chevron_right_rounded,
-                  color: FlickColors.textMuted, size: 20),
-          ],
+        child: Center(
+          child: isComplete
+              ? const Icon(Icons.check_rounded, color: Colors.white, size: 28)
+              : isUnlocked
+                  ? Text(
+                      '${level.levelNumber}',
+                      style: const TextStyle(
+                        color:      Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize:   20,
+                      ),
+                    )
+                  : const Icon(Icons.lock_rounded,
+                        color: FlickColors.textMuted, size: 20),
         ),
       ),
     );
 
+    // Pulsing scale animation for the current level
+    if (isCurrent) {
+      circle = circle
+          .animate(onPlay: (c) => c.repeat(reverse: true))
+          .scaleXY(
+            begin: 1.0,
+            end:   1.12,
+            duration: 900.ms,
+            curve: Curves.easeInOut,
+          );
+    }
+
+    final node = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Floating avatar emoji above current node
+        if (isCurrent)
+          const Text('🦊', style: TextStyle(fontSize: 22))
+              .animate(onPlay: (c) => c.repeat(reverse: true))
+              .moveY(begin: 0, end: -5, duration: 700.ms, curve: Curves.easeInOut)
+        else
+          const SizedBox(height: 22),
+
+        const SizedBox(height: 4),
+        circle,
+        const SizedBox(height: 6),
+
+        // Star rating
+        if (isComplete)
+          _StarRow(stars: stars),
+
+        const SizedBox(height: 4),
+
+        // Level title
+        SizedBox(
+          width: 90,
+          child: Text(
+            level.title,
+            style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                  color:  isUnlocked ? FlickColors.textPrimary : FlickColors.textMuted,
+                  fontSize: 11,
+                ),
+            textAlign: TextAlign.center,
+            maxLines:  2,
+            overflow:  TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+
     return Align(
       alignment: isLeft ? Alignment.centerLeft : Alignment.centerRight,
-      child: card
-          .animate(delay: Duration(milliseconds: index * 70))
-          .fadeIn(duration: 300.ms)
-          .slideX(
-            begin: isLeft ? -0.08 : 0.08,
-            end:   0,
-            curve: Curves.easeOut,
-          ),
+      child: Padding(
+        padding: EdgeInsets.only(
+          left:  isLeft  ? FlickSpacing.xl : 0,
+          right: !isLeft ? FlickSpacing.xl : 0,
+        ),
+        child: node
+            .animate(delay: Duration(milliseconds: index * 70))
+            .fadeIn(duration: 300.ms)
+            .slideX(
+              begin: isLeft ? -0.08 : 0.08,
+              end:   0,
+              curve: Curves.easeOut,
+            ),
+      ),
+    );
+  }
+}
+
+class _StarRow extends StatelessWidget {
+  const _StarRow({required this.stars});
+  final int stars;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(3, (i) => Icon(
+        i < stars ? Icons.star_rounded : Icons.star_outline_rounded,
+        size:  14,
+        color: i < stars ? const Color(0xFFFFC107) : FlickColors.border,
+      )),
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// Dotted vertical connector between nodes
+// Dashed vertical connector between nodes
 // ---------------------------------------------------------------------------
 
 class _PathConnector extends StatelessWidget {
@@ -503,19 +598,48 @@ class _PathConnector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 28,
+      height: 36,
       child: Center(
-        child: Container(
-          width: 2,
-          decoration: BoxDecoration(
-            color: complete
-                ? FlickColors.success.withValues(alpha: 0.5)
-                : FlickColors.border,
+        child: AnimatedContainer(
+          duration: 600.ms,
+          width: 36,
+          height: 36,
+          child: CustomPaint(
+            painter: _DashedLinePainter(
+              color: complete
+                  ? FlickColors.success.withValues(alpha: 0.7)
+                  : FlickColors.border,
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+class _DashedLinePainter extends CustomPainter {
+  const _DashedLinePainter({required this.color});
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const dashHeight = 5.0;
+    const dashSpace  = 3.0;
+    final paint = Paint()
+      ..color       = color
+      ..strokeWidth = 2.5
+      ..strokeCap   = StrokeCap.round;
+
+    double y = 0;
+    final x = size.width / 2;
+    while (y < size.height) {
+      canvas.drawLine(Offset(x, y), Offset(x, y + dashHeight), paint);
+      y += dashHeight + dashSpace;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedLinePainter old) => old.color != color;
 }
 
 // ---------------------------------------------------------------------------

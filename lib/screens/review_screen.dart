@@ -64,7 +64,13 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(context); // close dialog
-              Navigator.pop(context); // return to home
+              // Reset review session state so tab shows fresh next time.
+              setState(() {
+                _index       = 0;
+                _correct     = 0;
+                _answered    = 0;
+                _answerState = AnswerState.unanswered;
+              });
             },
             child: const Text('Done'),
           ),

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_theme.dart';
+import '../providers/review_provider.dart';
 import 'home_screen.dart';
 import 'daily_lesson_screen.dart';
+import 'review_screen.dart';
 import 'saga_map_screen.dart';
 import 'profile_screen.dart';
 
@@ -20,6 +22,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   final _screens = const [
     HomeScreen(),
     DailyLessonScreen(),
+    ReviewScreen(),
     SagaMapScreen(),
     ProfileScreen(),
   ];
@@ -32,6 +35,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final reviewCount = ref.watch(reviewProvider).length;
+
     return Scaffold(
       backgroundColor: FlickColors.background,
       body: IndexedStack(
@@ -39,30 +44,43 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         children: _screens,
       ),
       bottomNavigationBar: NavigationBar(
-        backgroundColor:      FlickColors.background,
-        indicatorColor:       FlickColors.primaryDim,
-        selectedIndex:        _index,
+        backgroundColor:       FlickColors.background,
+        indicatorColor:        FlickColors.primaryDim,
+        selectedIndex:         _index,
         onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
-          NavigationDestination(
-            icon:          Icon(Icons.home_outlined),
-            selectedIcon:  Icon(Icons.home_rounded),
-            label:         'Home',
+        destinations: [
+          const NavigationDestination(
+            icon:         Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home_rounded),
+            label:        'Home',
+          ),
+          const NavigationDestination(
+            icon:         Icon(Icons.menu_book_outlined),
+            selectedIcon: Icon(Icons.menu_book_rounded),
+            label:        'Learn',
           ),
           NavigationDestination(
-            icon:          Icon(Icons.menu_book_outlined),
-            selectedIcon:  Icon(Icons.menu_book_rounded),
-            label:         'Learn',
+            icon: Badge(
+              isLabelVisible: reviewCount > 0,
+              label: Text('$reviewCount'),
+              child: const Icon(Icons.replay_rounded),
+            ),
+            selectedIcon: Badge(
+              isLabelVisible: reviewCount > 0,
+              label: Text('$reviewCount'),
+              child: const Icon(Icons.replay_rounded),
+            ),
+            label: 'Review',
           ),
-          NavigationDestination(
-            icon:          Icon(Icons.route_outlined),
-            selectedIcon:  Icon(Icons.route_rounded),
-            label:         'Path',
+          const NavigationDestination(
+            icon:         Icon(Icons.route_outlined),
+            selectedIcon: Icon(Icons.route_rounded),
+            label:        'Path',
           ),
-          NavigationDestination(
-            icon:          Icon(Icons.person_outline_rounded),
-            selectedIcon:  Icon(Icons.person_rounded),
-            label:         'Profile',
+          const NavigationDestination(
+            icon:         Icon(Icons.person_outline_rounded),
+            selectedIcon: Icon(Icons.person_rounded),
+            label:        'Profile',
           ),
         ],
       ),

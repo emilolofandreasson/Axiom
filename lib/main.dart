@@ -17,12 +17,14 @@ import 'services/auth_service.dart';
 import 'services/supabase_sync_service.dart';
 import 'services/lesson_generator.dart';
 import 'services/puzzle_generator_service.dart';
+import 'services/question_contributor_service.dart';
 import 'services/question_library_service.dart';
 
-final authService       = AuthService(hmacSalt: Env.hmacSalt);
-final apiKeyService     = ApiKeyService();
-final questionLibrary   = QuestionLibraryService();
-bool onboardingDone     = false;
+final authService          = AuthService(hmacSalt: Env.hmacSalt);
+final apiKeyService        = ApiKeyService();
+final questionLibrary      = QuestionLibraryService();
+final questionContributor  = QuestionContributorService(library: questionLibrary);
+bool onboardingDone        = false;
 DateTime _sessionStartedAt = DateTime.now();
 
 // Non-final — updated by ApiKeyService when user saves/removes their key.

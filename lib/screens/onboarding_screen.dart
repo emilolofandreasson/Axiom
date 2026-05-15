@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +11,7 @@ import '../core/theme/app_theme.dart';
 import '../models/language.dart';
 import '../providers/daily_goal_provider.dart';
 import '../providers/language_provider.dart';
+import '../services/api_key_service.dart';
 import 'main_screen.dart';
 
 // Current privacy policy version — bump when policy changes.
@@ -32,6 +35,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   // Daily goal — user picks in onboarding step 4.
   int _selectedGoalXp = kDefaultDailyXpGoal;
 
+  // Gemini API key — optional, used for contributing questions.
+  String _geminiApiKey = '';
+
   @override
   void dispose() {
     _pageController.dispose();
@@ -39,7 +45,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   void _next() {
-    if (_currentPage < 4) {
+    if (_currentPage < 5) {
       _pageController.nextPage(duration: 350.ms, curve: Curves.easeInOut);
     } else {
       _finish();
@@ -62,6 +68,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
     // Persist chosen daily goal.
     await ref.read(dailyGoalProvider.notifier).setGoal(_selectedGoalXp);
+
+    // Save Gemini API key via ApiKeyService (secure storage + Supabase sync).
+    if (_geminiApiKey.trim().isNotEmpty) {
+      unawaited(ApiKeyService().saveKey(_geminiApiKey.trim()));
+    }
 
     // Analytics + consent log (non-blocking).
     _logConsentToSupabase();
@@ -125,6 +136,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     selectedGoalXp: _selectedGoalXp,
                     onGoalSelected: (v) => setState(() => _selectedGoalXp = v),
                   ),
+                  _GeminiKeyPage(
+                    onKeyChanged: (v) => setState(() => _geminiApiKey = v),
+                  ),
                   _ConsentPage(
                     consentAnonymous: _consentAnonymous,
                     consentPartner:   _consentPartner,
@@ -135,10 +149,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               ),
             ),
             _BottomBar(
-              currentPage: _currentPage,
-              totalPages:  5,
-              onContinue:  _next,
-              onBack:      _prev,
+              currentPage:    _currentPage,
+              totalPages:     6,
+              onContinue:     _next,
+              onBack:         _prev,
+              continueLabel:  _currentPage == 4 ? 'Skip' : null,
             ),
           ],
         ),
@@ -488,6 +503,94 @@ class _DailyGoalPage extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Gemini API key page (optional)
+// ---------------------------------------------------------------------------
+
+class _GeminiKeyPage extends StatefulWidget {
+  const _GeminiKeyPage({required this.onKeyChanged});
+
+  final ValueChanged<String> onKeyChanged;
+
+  @override
+  State<_GeminiKeyPage> createState() => _GeminiKeyPageState();
+}
+
+class _GeminiKeyPageState extends State<_GeminiKeyPage> {
+  final _controller = TextEditingController();
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(
+        FlickSpacing.xl, FlickSpacing.xl, FlickSpacing.xl, FlickSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('🤖', style: TextStyle(fontSize: 52))
+              .animate().fadeIn(duration: 300.ms),
+          const SizedBox(height: FlickSpacing.lg),
+          Text(
+            'Help Axiom grow',
+            style: Theme.of(context).textTheme.displaySmall,
+          ).animate().fadeIn(delay: 80.ms, duration: 350.ms),
+          const SizedBox(height: FlickSpacing.md),
+          Text(
+            'Add your free Gemini API key and Axiom will silently generate '
+            'new questions in the background after your lessons — contributing '
+            'to a shared library that makes the app better for everyone.\n\n'
+            'Your key is only used on your device and never shared.',
+            style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                  color: FlickColors.textSecondary, height: 1.6),
+          ).animate().fadeIn(delay: 160.ms, duration: 350.ms),
+          const SizedBox(height: FlickSpacing.xl),
+          TextField(
+            controller: _controller,
+            obscureText: _obscure,
+            onChanged: widget.onKeyChanged,
+            style: Theme.of(context).textTheme.bodyMedium,
+            decoration: InputDecoration(
+              labelText: 'Gemini API key',
+              hintText: 'AIza...',
+              filled: true,
+              fillColor: FlickColors.surface,
+              border: OutlineInputBorder(
+                borderRadius: const BorderRadius.all(FlickRadius.lg),
+                borderSide: const BorderSide(color: FlickColors.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: const BorderRadius.all(FlickRadius.lg),
+                borderSide: const BorderSide(color: FlickColors.border),
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  color: FlickColors.textMuted,
+                ),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
+            ),
+          ).animate().fadeIn(delay: 240.ms, duration: 350.ms),
+          const SizedBox(height: FlickSpacing.md),
+          Text(
+            'Get a free key at aistudio.google.com → Get API key. '
+            'You can also add it later in Profile → Settings.',
+            style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                  color: FlickColors.textMuted),
+          ).animate().fadeIn(delay: 300.ms, duration: 350.ms),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Consent page
 // ---------------------------------------------------------------------------
 
@@ -676,12 +779,14 @@ class _BottomBar extends StatelessWidget {
     required this.totalPages,
     required this.onContinue,
     this.onBack,
+    this.continueLabel,
   });
 
   final int currentPage;
   final int totalPages;
   final VoidCallback onContinue;
   final VoidCallback? onBack;
+  final String? continueLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -722,7 +827,10 @@ class _BottomBar extends StatelessWidget {
                 ).animate().fadeIn(),
               ElevatedButton(
                 onPressed: onContinue,
-                child: Text(currentPage == totalPages - 1 ? 'Get started' : 'Continue'),
+                child: Text(
+                  continueLabel ??
+                  (currentPage == totalPages - 1 ? 'Get started' : 'Continue'),
+                ),
               ),
             ],
           ),

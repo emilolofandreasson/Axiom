@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flick_sdk/flick_sdk.dart';
+import '../models/language.dart';
 import '../models/lesson.dart';
 import '../models/language_level.dart';
 import '../models/question.dart';
@@ -8,7 +9,7 @@ import 'review_provider.dart';
 import 'saga_provider.dart';
 import 'daily_goal_provider.dart';
 import 'hearts_provider.dart';
-import '../main.dart' show lessonGenerator, questionLibrary;
+import '../main.dart' show lessonGenerator, questionLibrary, questionContributor;
 
 // ---------------------------------------------------------------------------
 // Lesson state
@@ -336,6 +337,17 @@ class LessonNotifier extends Notifier<LessonState> {
     // Save wrong answers for spaced repetition review.
     unawaited(ref.read(reviewProvider.notifier)
         .addWrongAnswers(state.results, langCode));
+
+    // Contribute questions to global library using user's Gemini key (fire-and-forget).
+    final langName = kLanguages
+        .firstWhere((l) => l.code == langCode, orElse: () => kLanguages.first)
+        .name;
+    questionContributor.contributeAfterLesson(
+      languageCode: langCode,
+      languageName: langName,
+      userXp:       sagaAfter.xpForLanguage(langCode),
+      skillTag:     state.lesson.skillTag,
+    );
 
     // Refill hearts on lesson complete (reward for finishing).
     if (state.accuracy >= 0.8) {

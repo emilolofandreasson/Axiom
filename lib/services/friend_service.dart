@@ -138,9 +138,7 @@ class FriendService {
       if (ids.isEmpty) return [];
 
       final userRows = await _db
-          .from('users')
-          .select()
-          .inFilter('id', ids);
+          .rpc('get_user_profiles', params: {'ids': ids});
 
       return (userRows as List)
           .map((d) => UserProfile.fromMap(d['id'] as String, d as Map<String, dynamic>))
@@ -167,14 +165,14 @@ class FriendService {
 
       final allIds = [uid, ...friendIds];
       final userRows = await _db
-          .from('users')
-          .select('id, name, photo_url, total_xp, streak_count')
-          .inFilter('id', allIds)
-          .order('total_xp', ascending: false);
+          .rpc('get_user_profiles', params: {'ids': allIds});
 
-      return (userRows as List)
+      final profiles = (userRows as List)
           .map((d) => UserProfile.fromMap(d['id'] as String, d as Map<String, dynamic>))
           .toList();
+
+      profiles.sort((a, b) => b.totalXp.compareTo(a.totalXp));
+      return profiles;
     } catch (e) {
       debugPrint('[FriendService] leaderboard error: $e');
       return [];

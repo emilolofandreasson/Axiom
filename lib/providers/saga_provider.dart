@@ -20,6 +20,7 @@ class SagaState {
     this.streakCount    = 0,
     this.revealPowerups = 1,
     this.lastActiveDate,
+    this.isLoading      = false,
   });
 
   final Set<String>      completedIds;
@@ -28,6 +29,7 @@ class SagaState {
   final int              streakCount;
   final int              revealPowerups;
   final String?          lastActiveDate; // 'yyyy-MM-dd'
+  final bool             isLoading;
 
   /// Total XP across all languages — used for streaks / leaderboard.
   int get totalXp => xpByLanguage.values.fold(0, (s, v) => s + v);
@@ -50,6 +52,7 @@ class SagaState {
     int?              streakCount,
     int?              revealPowerups,
     String?           lastActiveDate,
+    bool?             isLoading,
   }) =>
       SagaState(
         completedIds:   completedIds   ?? this.completedIds,
@@ -58,6 +61,7 @@ class SagaState {
         streakCount:    streakCount    ?? this.streakCount,
         revealPowerups: revealPowerups ?? this.revealPowerups,
         lastActiveDate: lastActiveDate ?? this.lastActiveDate,
+        isLoading:      isLoading      ?? this.isLoading,
       );
 }
 
@@ -81,7 +85,7 @@ class SagaNotifier extends Notifier<SagaState> {
   @override
   SagaState build() {
     _load();
-    return const SagaState();
+    return const SagaState(isLoading: true);
   }
 
   // ---------------------------------------------------------------------------
@@ -122,6 +126,7 @@ class SagaNotifier extends Notifier<SagaState> {
         streakCount:    streak,
         revealPowerups: powers,
         lastActiveDate: lastDate,
+        isLoading:      false,
       );
       _checkDailyStreak(prefs, streak, lastDate);
     }
@@ -130,7 +135,7 @@ class SagaNotifier extends Notifier<SagaState> {
   Future<void> _loadFromSupabase(SharedPreferences prefs) async {
     try {
       final uid = Supabase.instance.client.auth.currentUser?.id;
-      if (uid == null) { state = const SagaState(); return; }
+      if (uid == null) { state = const SagaState(isLoading: false); return; }
 
       final row = await Supabase.instance.client
           .from('users')
@@ -138,7 +143,7 @@ class SagaNotifier extends Notifier<SagaState> {
           .eq('id', uid)
           .maybeSingle();
 
-      if (row == null) { state = const SagaState(); return; }
+      if (row == null) { state = const SagaState(isLoading: false); return; }
 
       // xp_by_language is JSONB — Supabase client returns it as Map<String, dynamic>.
       final rawMap = row['xp_by_language'] as Map<String, dynamic>?;
@@ -163,12 +168,13 @@ class SagaNotifier extends Notifier<SagaState> {
         streakCount:    streak,
         revealPowerups: powers,
         lastActiveDate: lastDate,
+        isLoading:      false,
       );
       _checkDailyStreak(prefs, streak, lastDate);
       debugPrint('[SagaNotifier] loaded from Supabase — totalXp: ${state.totalXp}');
     } catch (e) {
       debugPrint('[SagaNotifier] Supabase load failed: $e');
-      state = const SagaState();
+      state = const SagaState(isLoading: false);
     }
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flick_sdk/flick_sdk.dart';
 import '../core/theme/app_theme.dart';
 import '../providers/review_provider.dart';
 import 'home_screen.dart';
@@ -47,7 +48,14 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         backgroundColor:       FlickColors.background,
         indicatorColor:        FlickColors.primaryDim,
         selectedIndex:         _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        onDestinationSelected: (i) {
+          setState(() => _index = i);
+          const names = ['home', 'learn', 'review', 'path', 'profile'];
+          EventSensor.instance.emit('tab_viewed', {
+            'tab':         names[i],
+            'hour_of_day': DateTime.now().hour,
+          });
+        },
         destinations: [
           const NavigationDestination(
             icon:         Icon(Icons.home_outlined),

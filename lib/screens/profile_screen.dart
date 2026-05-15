@@ -47,8 +47,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
-    final p = await _profileService.loadProfile();
-    if (mounted) setState(() => _profile = p);
+    try {
+      final p = await _profileService.loadProfile();
+      if (mounted) setState(() => _profile = p);
+    } catch (_) {
+      if (mounted) setState(() => _profile = const UserProfile(uid: ''));
+    }
   }
 
   @override
@@ -63,6 +67,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final xpProgress     = level.isMax
         ? 1.0
         : level.progressFraction(langXp).clamp(0.02, 1.0); // min sliver so bar is visible
+
+    if (_profile == null || saga.isLoading) {
+      return Scaffold(
+        backgroundColor: FlickColors.background,
+        appBar: AppBar(title: const Text('Profile')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       backgroundColor: FlickColors.background,

@@ -9,7 +9,7 @@ import os
 import sys
 from urllib.parse import quote_plus
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from google.oauth2 import service_account
 from dotenv import load_dotenv
 
@@ -67,13 +67,13 @@ def get_all_tables():
     """Fetch all user tables from Supabase database."""
     try:
         with engine.connect() as conn:
-            query = """
+            query = text("""
                 SELECT table_name
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
                 AND table_type = 'BASE TABLE'
                 ORDER BY table_name
-            """
+            """)
             result = conn.execute(query)
             tables = [row[0] for row in result.fetchall()]
             return tables

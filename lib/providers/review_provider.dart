@@ -116,14 +116,11 @@ class ReviewNotifier extends Notifier<List<ReviewItem>> {
     await _save();
   }
 
-  /// Mark an item as reviewed; remove after 3 successful reviews.
+  /// Mark an item as reviewed; remove immediately on first correct answer.
   Future<void> markReviewed(String questionId, {required bool correct}) async {
-    if (!correct) return; // don't advance review count on wrong answers
+    if (!correct) return;
     final updated = state
-        .map((i) => i.question.id == questionId
-            ? i.copyWith(reviewCount: i.reviewCount + 1)
-            : i)
-        .where((i) => i.reviewCount < 3) // graduate after 3 correct reviews
+        .where((i) => i.question.id != questionId)
         .toList();
     state = updated;
     await _save();

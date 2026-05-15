@@ -34,14 +34,17 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
     Future.delayed(1200.ms, () {
       if (!mounted) return;
       final items = ref.read(reviewProvider);
-      if (_index + 1 < items.length) {
-        setState(() {
-          _index++;
-          _answerState = AnswerState.unanswered;
-        });
-      } else {
+      if (items.isEmpty) {
         _showSummary();
+        return;
       }
+      setState(() {
+        // Correct answer: item was removed, next item is now at same _index.
+        // Wrong answer: item stays, advance to next.
+        if (!isCorrect) _index = (_index + 1).clamp(0, items.length - 1);
+        _index       = _index.clamp(0, items.length - 1);
+        _answerState = AnswerState.unanswered;
+      });
     });
   }
 

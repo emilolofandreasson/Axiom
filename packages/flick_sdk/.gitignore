@@ -1,0 +1,16 @@
+# Dart/Flutter
+.dart_tool/
+.packages
+pubspec.lock
+build/
+doc/api/
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+
+# IDE
+.idea/
+.vscode/
+*.iml

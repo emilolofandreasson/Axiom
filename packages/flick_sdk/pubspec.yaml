@@ -1,0 +1,42 @@
+name: flick_sdk
+description: >
+  Shared SDK for the Flick App Factory — identity, event sensing,
+  SQLite WAL buffer, batch sync, and Edge AI bridge.
+  Drop into any Flick app to get instant 360-view data collection.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Local event buffer
+  sqflite: ^2.3.3
+  path: ^1.9.0
+
+  # Crypto — HMAC subject_id hashing
+  crypto: ^3.0.3
+
+  # HTTP batch upload to Event Hub
+  http: ^1.2.2
+
+  # Unique IDs
+  uuid: ^4.4.0
+
+  # Connectivity check before sync
+  connectivity_plus: ^6.0.3
+
+  # Secure storage for tokens
+  flutter_secure_storage: ^9.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: false

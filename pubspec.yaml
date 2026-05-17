@@ -13,7 +13,7 @@ dependencies:
 
   # Flick shared SDK — identity, event sensing, SQLite buffer, Edge AI
   flick_sdk:
-    path: ../flick_sdk
+    path: packages/flick_sdk
 
   # State management
   flutter_riverpod: ^2.5.1

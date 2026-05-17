@@ -340,7 +340,7 @@ packages:
   flick_sdk:
     dependency: "direct main"
     description:
-      path: "../flick_sdk"
+      path: "packages/flick_sdk"
       relative: true
     source: path
     version: "0.1.0"

@@ -1,0 +1,60 @@
+version: 2
+
+sources:
+  - name: bronze
+    database: flick_lake
+    schema: bronze
+    description: >
+      Raw events landed by the Azure Event Hub ingestor.
+      JSON payload is stored verbatim; Silver models parse and validate.
+    tables:
+      - name: raw_events
+        description: "One row per event emitted by any Flick app."
+        columns:
+          - name: event_id
+            description: ULID — globally unique de-dup key.
+            tests:
+              - not_null
+              - unique
+
+          - name: event_type
+            description: snake_case event name (e.g. lesson_completed).
+            tests:
+              - not_null
+
+          - name: app_id
+            description: Emitting app identifier.
+            tests:
+              - not_null
+              - accepted_values:
+                  values: [axiom, golf_flick, health_flick, ridely_flick]
+
+          - name: app_version
+            tests:
+              - not_null
+
+          - name: platform
+            tests:
+              - accepted_values:
+                  values: [ios, android, web]
+
+          - name: subject_id
+            description: HMAC-SHA256 of Entra sub claim — PII-safe.
+            tests:
+              - not_null
+
+          - name: session_id
+            description: ULID generated at app cold-start.
+            tests:
+              - not_null
+
+          - name: emitted_at_utc
+            description: Device clock at event creation (UTC ISO-8601).
+            tests:
+              - not_null
+
+          - name: received_at_utc
+            description: Server-side ingest timestamp. Null in Bronze.
+
+          - name: payload_json
+            description: JSON string of app-specific payload fields.

@@ -1,0 +1,215 @@
+---
+# ============================================================================
+# Flick App Factory — Data Contract v1.0
+# ============================================================================
+# This file is the authoritative schema definition for all events emitted
+# by any Flick app. It is the contract between:
+#   - App developers (must emit these fields)
+#   - Analytics Engineers (dbt models depend on these fields)
+#   - Data Products team (B2B exports are shaped from these columns)
+#
+# Versioning: bump minor on new optional fields, major on breaking changes.
+# Validation: enforced by Schema Registry (Confluent/Apicurio) on ingest.
+# ============================================================================
+
+id: flick_data_contract
+name: Flick Ecosystem Event Contract
+version: "1.0.0"
+owner: analytics-engineering
+status: active
+updated_at: "2026-05-09"
+
+# ── Envelope ─────────────────────────────────────────────────────────────────
+# Required in EVERY event regardless of app or event type.
+
+envelope:
+  - field: event_id
+    type: string(26)
+    required: true
+    description: ULID — globally unique, lexicographically sortable. De-dup key.
+    example: "01HWXYZ3ABCDEFGHJKMNPQRST"
+    constraints:
+      - not_null
+      - unique
+      - pattern: "^[0-9A-Z]{26}$"
+
+  - field: event_type
+    type: string
+    required: true
+    description: snake_case event name. Namespace as <domain>_<action>.
+    example: "lesson_completed"
+    constraints:
+      - not_null
+      - pattern: "^[a-z][a-z0-9_]+$"
+
+  - field: app_id
+    type: string
+    required: true
+    description: Identifier of the emitting app in the Flick ecosystem.
+    accepted_values: [axiom, golf_flick, health_flick, ridely_flick]
+    example: "axiom"
+    constraints:
+      - not_null
+
+  - field: app_version
+    type: string
+    required: true
+    description: Semantic version of the app at time of event.
+    example: "1.2.3"
+
+  - field: platform
+    type: string
+    required: true
+    accepted_values: [ios, android, web]
+    example: "ios"
+
+  - field: emitted_at_utc
+    type: timestamp
+    required: true
+    description: Device clock at event creation (UTC ISO-8601).
+    example: "2026-05-09T11:42:00.000Z"
+    constraints:
+      - not_null
+      - valid_timestamp
+
+  - field: received_at_utc
+    type: timestamp
+    required: false
+    description: Server-side timestamp added by the Event Hub ingestor.
+    note: Null in Bronze, populated in Silver by stream processor.
+
+# ── Identity ──────────────────────────────────────────────────────────────────
+# PII-safe. No raw email, name, or OID should ever appear in the lake.
+
+identity:
+  - field: subject_id
+    type: string(36)
+    required: true
+    description: >
+      HMAC-SHA256 of the Entra ID sub claim, formatted as UUID v4.
+      Stable across sessions and apps for the same user.
+      NEVER reversible to PII.
+    example: "b3a2f1e0-9c8d-4b7a-a6e5-d4c3b2a10f9e"
+    constraints:
+      - not_null
+      - pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$"
+
+  - field: session_id
+    type: string(26)
+    required: true
+    description: ULID generated at app cold-start. Groups events in a session.
+    constraints:
+      - not_null
+
+  - field: device_id
+    type: string
+    required: false
+    description: Anonymized device fingerprint (hashed). Optional per jurisdiction.
+
+# ── Context (recommended) ─────────────────────────────────────────────────────
+# Emitted when available. Enriches ML features and segmentation.
+
+context:
+  - field: device_locale
+    type: string
+    description: BCP-47 locale string.
+    example: "en-SE"
+
+  - field: device_timezone
+    type: string
+    example: "Europe/Stockholm"
+
+  - field: device_os_version
+    type: string
+    example: "18.1.0"
+
+  - field: network_type
+    type: string
+    accepted_values: [wifi, cellular, offline, unknown]
+
+  - field: battery_pct
+    type: integer
+    constraints:
+      - range: [0, 100]
+
+# ── Intent Dimensions (high-value) ───────────────────────────────────────────
+# Captured via onboarding and in-app surveys. Core of the B2B data product.
+
+intent:
+  - field: intent_primary_reason
+    type: string
+    description: Why the user is using this app.
+    example: "moving_abroad"
+    accepted_values:
+      - moving_abroad
+      - career_development
+      - travel
+      - cultural_interest
+      - academic
+      - other
+
+  - field: intent_destination_country
+    type: string(2)
+    description: ISO 3166-1 alpha-2 country code.
+    example: "ES"
+
+  - field: intent_travel_window_months
+    type: integer
+    description: How many months until the intent-triggering event.
+
+  - field: intent_professional_context
+    type: string
+    accepted_values: [job_relocation, promotion, new_role, freelance, student, none]
+
+  - field: intent_tags
+    type: array<string>
+    description: Free-form intent tags for ML feature engineering.
+    example: ["travel:spain", "career:relocation"]
+
+# ── App-Specific Payload Schema per Event Type ────────────────────────────────
+# These are validated in the Silver layer by dbt tests.
+
+event_schemas:
+
+  lesson_completed:
+    description: Emitted when a user finishes a lesson in Axiom.
+    required_payload_fields:
+      - lesson_id
+      - course_language
+      - cefr_level
+      - skill_tag
+      - exercise_count
+      - correct_count
+      - accuracy_pct
+      - duration_seconds
+      - xp_earned
+    optional_payload_fields:
+      - streak_day
+      - hint_used_count
+      - edge_model_id
+      - edge_avg_latency_ms
+
+  answer_submitted:
+    description: Single exercise answer within a lesson.
+    required_payload_fields:
+      - lesson_id
+      - question_id
+      - question_type
+      - skill_tag
+      - is_correct
+      - time_taken_ms
+      - cefr_level
+
+  session_started:
+    description: App foreground / cold start.
+    required_payload_fields:
+      - app_id
+      - platform
+
+  chat_message_sent:
+    description: User message in the AI Tutor chat.
+    required_payload_fields:
+      - lesson_id
+      - question_id
+      - message_len
+      - turn_number

@@ -38,16 +38,17 @@ if missing:
 SUPABASE_URL      = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY      = os.environ["SUPABASE_SERVICE_KEY"]
 GEMINI_API_KEY    = os.environ["GEMINI_SEED_API_KEY"]
-GEMINI_MODEL      = "gemini-1.5-flash"   # stable, high free-tier quota
+GEMINI_MODEL      = "gemini-2.0-flash"
 GEMINI_ENDPOINT   = (
-    f"https://generativelanguage.googleapis.com/v1/models/"
+    f"https://generativelanguage.googleapis.com/v1beta/models/"
     f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 )
 
 MIN_QUESTIONS     = 50    # target floor per (language, cefr_level)
 BATCH_SIZE        = 10    # questions generated per Gemini call
-MAX_BATCHES       = 5     # max Gemini calls per run (cost guard)
-RETRY_DELAY_S     = 5     # seconds between retries on rate-limit
+MAX_BATCHES       = 10    # max Gemini calls per run
+RETRY_DELAY_S     = 10    # seconds between retries on rate-limit
+INTER_CALL_DELAY  = 4     # seconds between successful calls (pacing)
 
 # Languages and CEFR levels to maintain
 TARGETS = [
@@ -301,7 +302,7 @@ def main():
                 print(f"\nReached MAX_BATCHES ({MAX_BATCHES}), stopping early.")
                 break
 
-            time.sleep(1)  # polite pacing
+            time.sleep(INTER_CALL_DELAY)  # polite pacing between calls
 
     print(f"\nDone. Total inserted: {total_inserted}. Gemini calls: {batches_used}.")
     if total_inserted == 0 and batches_used == 0:

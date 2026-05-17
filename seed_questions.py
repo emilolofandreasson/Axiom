@@ -38,7 +38,7 @@ if missing:
 SUPABASE_URL      = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY      = os.environ["SUPABASE_SERVICE_KEY"]
 GEMINI_API_KEY    = os.environ["GEMINI_SEED_API_KEY"]
-GEMINI_MODEL      = "gemini-2.0-flash"
+GEMINI_MODEL      = "gemini-2.0-flash-lite"   # 30 RPM free tier vs 15 for flash
 GEMINI_ENDPOINT   = (
     f"https://generativelanguage.googleapis.com/v1beta/models/"
     f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
@@ -47,8 +47,8 @@ GEMINI_ENDPOINT   = (
 MIN_QUESTIONS     = 50    # target floor per (language, cefr_level)
 BATCH_SIZE        = 10    # questions generated per Gemini call
 MAX_BATCHES       = 10    # max Gemini calls per run
-RETRY_DELAY_S     = 10    # seconds between retries on rate-limit
-INTER_CALL_DELAY  = 4     # seconds between successful calls (pacing)
+RETRY_DELAY_S     = 15    # seconds between retries on rate-limit
+INTER_CALL_DELAY  = 8     # seconds between successful calls (~7 RPM, well under 30)
 
 # Languages and CEFR levels to maintain
 TARGETS = [

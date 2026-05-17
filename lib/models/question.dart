@@ -67,6 +67,7 @@ final class WordOrderQuestion extends Question {
     required this.prompt,
     required this.shuffledWords,
     required this.correctOrder,
+    this.translation,
     super.hintText,
     super.globalId,
   });
@@ -74,6 +75,7 @@ final class WordOrderQuestion extends Question {
   final String       prompt;
   final List<String> shuffledWords;
   final List<int>    correctOrder;
+  final String?      translation; // English meaning of the sentence
 
   List<String> get correctSentence =>
       correctOrder.map((i) => shuffledWords[i]).toList();
@@ -86,6 +88,7 @@ final class WordOrderQuestion extends Question {
     prompt:        prompt,
     shuffledWords: shuffledWords,
     correctOrder:  correctOrder,
+    translation:   translation,
     hintText:      hintText,
     globalId:      id,
   );

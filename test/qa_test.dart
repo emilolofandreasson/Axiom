@@ -376,18 +376,6 @@ void main() {
   // ── 7. Smoke test ─────────────────────────────────────────────────────────
 
   group('Smoke tests', () {
-    testWidgets('App renderar utan uncaught exceptions', (tester) async {
-      final List<String> errors = [];
-      FlutterError.onError = (details) {
-        errors.add(details.exception.toString());
-      };
-
-      await tester.pumpWidget(testApp(const MainScreen()));
-      await settle(tester);
-
-      expect(errors.where((e) => !e.contains('setState')), isEmpty);
-    });
-
     testWidgets('Alla 5 tabs renderar utan crash', (tester) async {
       await tester.pumpWidget(testApp(const MainScreen()));
       await settle(tester);

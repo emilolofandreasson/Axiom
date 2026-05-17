@@ -210,15 +210,24 @@ class LessonNotifier extends Notifier<LessonState> {
   }
 
   Future<void> generateInitialLesson() async {
+    final prefs    = await SharedPreferences.getInstance();
+    final startCefr = prefs.getString('starting_cefr_level') ?? 'A1';
     final language = ref.read(languageProvider);
     final saga     = ref.read(sagaProvider);
 
     state = state.copyWith(isGenerating: true, lastGenerationFailed: false);
 
+    final actualXp   = saga.xpForLanguage(language.code);
+    final startMinXp = kLanguageLevels
+        .firstWhere((l) => l.cefrCode == startCefr,
+            orElse: () => kLanguageLevels.first)
+        .xpThreshold;
+    final effectiveXp = actualXp > startMinXp ? actualXp : startMinXp;
+
     final generated = await lessonGenerator.generate(
       languageCode: language.code,
       languageName: language.name,
-      userXp:       saga.xpForLanguage(language.code),
+      userXp:       effectiveXp,
     );
 
     if (generated != null) {

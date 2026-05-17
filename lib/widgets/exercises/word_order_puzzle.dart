@@ -119,8 +119,9 @@ class _WordOrderPuzzleState extends State<WordOrderPuzzle> {
         if (isAnswered) ...[
           const SizedBox(height: FlickSpacing.lg),
           _FeedbackBanner(
-            isCorrect:  widget.answerState == AnswerState.correct,
-            correction: correct.join(' '),
+            isCorrect:   widget.answerState == AnswerState.correct,
+            correction:  correct.join(' '),
+            translation: widget.question.translation,
           ),
         ],
       ],
@@ -234,10 +235,15 @@ class _WordChip extends StatelessWidget {
 }
 
 class _FeedbackBanner extends StatelessWidget {
-  const _FeedbackBanner({required this.isCorrect, required this.correction});
+  const _FeedbackBanner({
+    required this.isCorrect,
+    required this.correction,
+    this.translation,
+  });
 
-  final bool isCorrect;
-  final String correction;
+  final bool    isCorrect;
+  final String  correction;
+  final String? translation;
 
   @override
   Widget build(BuildContext context) {
@@ -274,6 +280,15 @@ class _FeedbackBanner extends StatelessWidget {
                     style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                           color: FlickColors.textSecondary,
                           fontStyle: FontStyle.italic,
+                        ),
+                  ),
+                ],
+                if (translation != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    translation!,
+                    style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                          color: FlickColors.textMuted,
                         ),
                   ),
                 ],

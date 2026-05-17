@@ -119,7 +119,7 @@ class LessonGenerator {
       'Use this exact schema:\n'
       '[\n'
       '  {"type":"multiple_choice","prompt":"...","options":["wrong","wrong","correct","wrong"],"correct_index":2,"hint":null},\n'
-      '  {"type":"word_order","prompt":"Arrange into a correct sentence.","shuffled_words":["...","...","..."],"correct_order":[1,0,2]},\n'
+      '  {"type":"word_order","prompt":"Arrange into a correct sentence.","translation":"English meaning of the sentence","shuffled_words":["...","...","..."],"correct_order":[1,0,2]},\n'
       '  {"type":"multiple_choice","prompt":"...","options":["wrong","correct","wrong","wrong"],"correct_index":1,"hint":"..."},\n'
       '  {"type":"multiple_choice","prompt":"...","options":["correct","wrong","wrong","wrong"],"correct_index":0,"hint":null}\n'
       ']\n'
@@ -128,6 +128,7 @@ class LessonGenerator {
       'Rules: 3 multiple_choice + 1 word_order. '
       'Correct answer for MC must always be at correct_index (0-based). '
       'shuffled_words for word_order: 3–6 words. '
+      'translation for word_order: English meaning of the complete sentence. '
       'correct_order = INTEGER INDICES (0-based positions in shuffled_words) in the correct sequence. '
       'Example: shuffled_words:["café","Yo","tomo"] correct_order:[1,2,0] NOT the words themselves. '
       'Vary vocabulary — do not repeat words from previous exercises.';
@@ -223,6 +224,7 @@ class LessonGenerator {
                 'Arrange into a correct sentence.',
             shuffledWords: words,
             correctOrder:  order,
+            translation:   q['translation'] as String?,
             globalId:      gid,
           ));
         }

@@ -22,41 +22,14 @@ class AuthGateScreen extends StatelessWidget {
             children: [
               const Spacer(),
 
-              // Logo icon med glöd-skugga
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color:      FlickColors.primary.withValues(alpha: 0.22),
-                      blurRadius: 40,
-                      offset:     const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: SvgPicture.asset(
-                  'assets/images/icon.svg',
-                  width:  96,
-                  height: 96,
-                ),
-              )
-                  .animate()
-                  .scale(
-                    begin:    const Offset(0.5, 0.5),
-                    duration: 600.ms,
-                    curve:    Curves.elasticOut,
-                  ),
-
-              const SizedBox(height: FlickSpacing.xl),
-
               // Wordmark
               SvgPicture.asset(
                 'assets/images/logo.svg',
                 height: 56,
               )
                   .animate()
-                  .fadeIn(delay: 200.ms, duration: 400.ms)
-                  .slideY(begin: 0.1, end: 0, delay: 200.ms, duration: 400.ms),
+                  .fadeIn(duration: 400.ms)
+                  .slideY(begin: 0.1, end: 0, duration: 400.ms),
 
               const SizedBox(height: FlickSpacing.sm),
 

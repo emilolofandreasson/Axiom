@@ -1,14 +1,13 @@
 // integration_test/app_test.dart
 //
-// Axiom QA Integration Tests
-// Run with: flutter test integration_test/app_test.dart -d chrome
+// Axiom QA Widget Tests
+// Run with: flutter test integration_test/app_test.dart
 //
 // Provider overrides inject mock data — no live Supabase connection needed.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:integration_test/integration_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:axiom/core/theme/app_theme.dart';
@@ -131,8 +130,6 @@ Widget testApp(Widget home, {List<Override> extra = const []}) =>
 // ---------------------------------------------------------------------------
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-
   setUpAll(() async {
     // Initialize Supabase with placeholder credentials.
     // Real API calls are blocked by provider overrides — only the client

@@ -35,10 +35,10 @@ if missing:
 # Config
 # ---------------------------------------------------------------------------
 
-SUPABASE_URL      = os.environ["SUPABASE_URL"]
+SUPABASE_URL      = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY      = os.environ["SUPABASE_SERVICE_KEY"]
 GEMINI_API_KEY    = os.environ["GEMINI_SEED_API_KEY"]
-GEMINI_MODEL      = "gemini-2.0-flash"
+GEMINI_MODEL      = "gemini-1.5-flash"   # stable, high free-tier quota
 GEMINI_ENDPOINT   = (
     f"https://generativelanguage.googleapis.com/v1beta/models/"
     f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
@@ -47,7 +47,7 @@ GEMINI_ENDPOINT   = (
 MIN_QUESTIONS     = 50    # target floor per (language, cefr_level)
 BATCH_SIZE        = 10    # questions generated per Gemini call
 MAX_BATCHES       = 5     # max Gemini calls per run (cost guard)
-RETRY_DELAY_S     = 3     # seconds between retries on rate-limit
+RETRY_DELAY_S     = 5     # seconds between retries on rate-limit
 
 # Languages and CEFR levels to maintain
 TARGETS = [
@@ -98,8 +98,12 @@ def get_counts():
     """Returns dict {(language, cefr_level): count} for non-defective questions."""
     url = f"{SUPABASE_URL}/rest/v1/global_questions?select=language,cefr_level&is_defective=eq.false"
     resp = requests.get(url, headers=HEADERS, timeout=30)
-    resp.raise_for_status()
+    if not resp.ok:
+        print(f"  Supabase error {resp.status_code}: {resp.text[:300]}")
+        print("  Hint: SUPABASE_SERVICE_KEY must be the service_role key, not the anon key.")
+        resp.raise_for_status()
     rows = resp.json()
+    print(f"  Supabase: fetched {len(rows)} total question records")
     counts = {}
     for row in rows:
         key = (row["language"], row["cefr_level"])
@@ -163,9 +167,15 @@ def call_gemini(prompt: str, retries: int = 3) -> list[dict] | None:
         try:
             resp = requests.post(GEMINI_ENDPOINT, json=body, timeout=60)
             if resp.status_code == 429:
-                print(f"  Rate limited, waiting {RETRY_DELAY_S}s...")
-                time.sleep(RETRY_DELAY_S)
+                wait = RETRY_DELAY_S * (attempt + 1)
+                print(f"  Rate limited (429), waiting {wait}s... (attempt {attempt+1}/{retries})")
+                time.sleep(wait)
                 continue
+            if not resp.ok:
+                print(f"  Gemini error {resp.status_code}: {resp.text[:300]}")
+                print(f"  Model used: {GEMINI_MODEL}")
+                print("  Hint: Ensure GEMINI_SEED_API_KEY is valid and has access to this model.")
+                break
             resp.raise_for_status()
             text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
             clean = text.strip().lstrip("```json").lstrip("```").rstrip("```").strip()

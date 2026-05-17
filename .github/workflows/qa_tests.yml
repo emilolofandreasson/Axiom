@@ -18,7 +18,6 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.0'
           channel: 'stable'
           cache: true
 
@@ -31,8 +30,5 @@ jobs:
       - name: Run unit tests
         run: flutter test test/
 
-      - name: Run integration tests (Chrome headless)
-        run: |
-          flutter test integration_test/app_test.dart \
-            -d web-server \
-            --web-renderer html
+      - name: Run integration tests (Dart VM)
+        run: flutter test integration_test/app_test.dart

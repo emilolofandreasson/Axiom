@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/theme/app_theme.dart';
 import '../models/language.dart';
@@ -85,6 +86,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  // Axiom icon mark
+                  SvgPicture.asset(
+                    'assets/images/icon.svg',
+                    width: 34,
+                    height: 34,
+                  ),
+                  const SizedBox(width: FlickSpacing.sm),
                   Expanded(
                     child: Text(
                       _greeting(language.code),

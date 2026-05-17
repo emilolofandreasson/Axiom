@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+
+  <!-- Primary speech bubble — solid indigo -->
+  <rect x="4" y="6" width="62" height="42" rx="14" fill="#3D5AFE"/>
+  <!-- Tail down-left -->
+  <path d="M16 48 L8 64 L34 48Z" fill="#3D5AFE"/>
+  <!-- White dots -->
+  <circle cx="25" cy="27" r="5" fill="white"/>
+  <circle cx="35" cy="27" r="5" fill="white"/>
+  <circle cx="45" cy="27" r="5" fill="white"/>
+
+  <!-- Secondary speech bubble — soft indigo (reply) -->
+  <rect x="34" y="54" width="62" height="36" rx="14" fill="#8FA3FF"/>
+  <!-- Tail down-right -->
+  <path d="M84 90 L92 104 L66 90Z" fill="#8FA3FF"/>
+  <!-- White dots -->
+  <circle cx="53" cy="72" r="4.5" fill="white"/>
+  <circle cx="65" cy="72" r="4.5" fill="white"/>
+  <circle cx="77" cy="72" r="4.5" fill="white"/>
+
+</svg>

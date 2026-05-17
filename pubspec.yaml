@@ -32,6 +32,9 @@ dependencies:
   # Haptics
   flutter_haptic: ^0.0.1+1
 
+  # SVG rendering (logotyp)
+  flutter_svg: ^2.0.10+1
+
   # Media
   image_picker: ^1.1.2
   supabase_flutter: ^2.12.4

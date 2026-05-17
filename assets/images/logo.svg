@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 72" width="260" height="72">
+
+  <!-- ── Icon mark ───────────────────────────────────── -->
+
+  <!-- Primary bubble — solid indigo -->
+  <rect x="2" y="4" width="44" height="28" rx="9" fill="#3D5AFE"/>
+  <path d="M10 32 L5 42 L22 32Z" fill="#3D5AFE"/>
+  <!-- White dots -->
+  <circle cx="16" cy="18" r="3.4" fill="white"/>
+  <circle cx="24" cy="18" r="3.4" fill="white"/>
+  <circle cx="32" cy="18" r="3.4" fill="white"/>
+
+  <!-- Secondary bubble — soft indigo -->
+  <rect x="22" y="36" width="44" height="26" rx="9" fill="#8FA3FF"/>
+  <path d="M58 62 L64 72 L47 62Z" fill="#8FA3FF"/>
+  <!-- White dots -->
+  <circle cx="36" cy="49" r="3" fill="white"/>
+  <circle cx="44" cy="49" r="3" fill="white"/>
+  <circle cx="52" cy="49" r="3" fill="white"/>
+
+  <!-- ── Wordmark ─────────────────────────────────────── -->
+  <text
+    x="82"
+    y="44"
+    font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif"
+    font-size="30"
+    font-weight="700"
+    letter-spacing="-0.8"
+    fill="#1A1A2E"
+  >axiom</text>
+
+  <text
+    x="83"
+    y="60"
+    font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif"
+    font-size="10"
+    font-weight="400"
+    letter-spacing="2"
+    fill="#ADB5C2"
+  >LEARN LANGUAGES</text>
+
+</svg>

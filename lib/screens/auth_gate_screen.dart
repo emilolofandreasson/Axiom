@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../core/theme/app_theme.dart';
 import '../main.dart' show authService;
 import 'auth_screen.dart';
@@ -21,32 +22,41 @@ class AuthGateScreen extends StatelessWidget {
             children: [
               const Spacer(),
 
-              // Logo
+              // Logo icon med glöd-skugga
               Container(
-                width: 88, height: 88,
                 decoration: BoxDecoration(
-                  color:  FlickColors.primary,
-                  shape:  BoxShape.circle,
+                  shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color:      FlickColors.primary.withValues(alpha: 0.3),
-                      blurRadius: 32, offset: const Offset(0, 8)),
+                      color:      FlickColors.primary.withValues(alpha: 0.22),
+                      blurRadius: 40,
+                      offset:     const Offset(0, 10),
+                    ),
                   ],
                 ),
-                child: const Icon(Icons.auto_awesome_rounded,
-                    color: Colors.white, size: 44),
+                child: SvgPicture.asset(
+                  'assets/images/icon.svg',
+                  width:  96,
+                  height: 96,
+                ),
               )
                   .animate()
-                  .scale(begin: const Offset(0.5, 0.5), duration: 600.ms,
-                      curve: Curves.elasticOut),
+                  .scale(
+                    begin:    const Offset(0.5, 0.5),
+                    duration: 600.ms,
+                    curve:    Curves.elasticOut,
+                  ),
 
               const SizedBox(height: FlickSpacing.xl),
 
-              Text('Axiom',
-                  style: Theme.of(context).textTheme.displaySmall!.copyWith(
-                      fontSize: 40, letterSpacing: -1))
+              // Wordmark
+              SvgPicture.asset(
+                'assets/images/logo.svg',
+                height: 56,
+              )
                   .animate()
-                  .fadeIn(delay: 200.ms, duration: 400.ms),
+                  .fadeIn(delay: 200.ms, duration: 400.ms)
+                  .slideY(begin: 0.1, end: 0, delay: 200.ms, duration: 400.ms),
 
               const SizedBox(height: FlickSpacing.sm),
 

@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flick_sdk/flick_sdk.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/language.dart';
 import '../models/lesson.dart';
 import '../models/language_level.dart';
+import '../models/puzzle_level.dart';
 import '../models/question.dart';
 import 'language_provider.dart';
 import 'review_provider.dart';
@@ -45,6 +47,8 @@ class LessonState {
     this.newStreak = 0,
     this.prevLevelLabel,
     this.newLevelLabel,
+    this.consecutiveCorrect = 0,
+    this.accelerationCefr,
   });
 
   final Lesson lesson;
@@ -61,6 +65,8 @@ class LessonState {
   /// Non-null when the player leveled up this lesson.
   final String? prevLevelLabel;
   final String? newLevelLabel;
+  final int consecutiveCorrect;
+  final String? accelerationCefr;
 
   Question get currentQuestion => lesson.questions[currentIndex];
   bool get isLastQuestion => currentIndex >= lesson.questions.length - 1;
@@ -87,6 +93,8 @@ class LessonState {
     int? newStreak,
     Object? prevLevelLabel = _sentinel,
     Object? newLevelLabel  = _sentinel,
+    int? consecutiveCorrect,
+    Object? accelerationCefr = _sentinel,
   }) =>
       LessonState(
         lesson:                lesson               ?? this.lesson,
@@ -105,6 +113,10 @@ class LessonState {
         newLevelLabel:         newLevelLabel == _sentinel
             ? this.newLevelLabel
             : newLevelLabel as String?,
+        consecutiveCorrect:    consecutiveCorrect ?? this.consecutiveCorrect,
+        accelerationCefr:      accelerationCefr == _sentinel
+            ? this.accelerationCefr
+            : accelerationCefr as String?,
       );
 }
 
@@ -279,6 +291,13 @@ class LessonNotifier extends Notifier<LessonState> {
       'time_taken_ms': elapsed,
       'cefr_level':    q.cefrLevel,
     });
+
+    if (isCorrect) {
+      state = state.copyWith(consecutiveCorrect: state.consecutiveCorrect + 1);
+      _checkStreakAcceleration();
+    } else {
+      state = state.copyWith(consecutiveCorrect: 0);
+    }
   }
 
   void abandonLesson() {
@@ -296,6 +315,42 @@ class LessonNotifier extends Notifier<LessonState> {
       'time_seconds':    elapsed,
     });
     state = state.copyWith(status: LessonStatus.abandoned);
+  }
+
+  Future<void> _checkStreakAcceleration() async {
+    if (state.consecutiveCorrect < 5) return;
+
+    final prefs       = await SharedPreferences.getInstance();
+    final startCefr   = prefs.getString('starting_cefr_level') ?? 'A1';
+    final currentCefr = state.lesson.cefrLevel;
+    final next        = nextCefrLevel(currentCefr);
+
+    if (next == null) return;
+    if (cefrOrder(currentCefr) >= cefrOrder(startCefr)) return;
+
+    final language = ref.read(languageProvider);
+    final langCode = language.code;
+    final levels   = kPuzzleLevelsByLanguage[langCode];
+    if (levels == null) return;
+
+    state = state.copyWith(
+      accelerationCefr:   next,
+      consecutiveCorrect: 0,
+    );
+
+    await ref.read(sagaProvider.notifier).completeLevelsUpToCefr(
+      levels, next, langCode,
+    );
+
+    EventSensor.instance.emit('cefr_acceleration', {
+      'from_cefr':       currentCefr,
+      'to_cefr':         next,
+      'course_language': langCode,
+    });
+  }
+
+  void clearAccelerationBanner() {
+    state = state.copyWith(accelerationCefr: null);
   }
 
   void advance() {

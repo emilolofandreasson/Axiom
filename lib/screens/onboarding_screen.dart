@@ -10,8 +10,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flick_sdk/flick_sdk.dart';
 import '../core/theme/app_theme.dart';
 import '../models/language.dart';
+import '../models/puzzle_level.dart';
 import '../providers/daily_goal_provider.dart';
 import '../providers/language_provider.dart';
+import '../providers/saga_provider.dart';
 import '../services/api_key_service.dart';
 import 'main_screen.dart';
 
@@ -33,7 +35,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   bool _consentAnonymous = false;
   bool _consentPartner   = false;
 
-  // Daily goal — user picks in onboarding step 4.
+  // CEFR self-assessment — user picks in onboarding step 4.
+  String _selectedCefr = 'A1';
+
+  // Daily goal — user picks in onboarding step 5.
   int _selectedGoalXp = kDefaultDailyXpGoal;
 
   // Gemini API key — optional, used for contributing questions.
@@ -46,12 +51,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   void _next() {
-    if (_currentPage == 4) {
+    if (_currentPage == 5) {
       // Gemini page — "Skip" shows confirmation dialog.
       _showSkipGeminiDialog();
       return;
     }
-    if (_currentPage < 5) {
+    if (_currentPage < 6) {
       _pageController.nextPage(duration: 350.ms, curve: Curves.easeInOut);
     } else {
       _finish();
@@ -110,9 +115,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     await prefs.setBool('consent_partner_profile',  _consentPartner);
     await prefs.setString('consent_policy_version', _kPolicyVersion);
     await prefs.setString('consent_shown_at', DateTime.now().toIso8601String());
+    await prefs.setString('starting_cefr_level', _selectedCefr);
 
     // Persist chosen daily goal.
     await ref.read(dailyGoalProvider.notifier).setGoal(_selectedGoalXp);
+
+    // Auto-complete lower CEFR levels based on self-assessment.
+    if (_selectedCefr != 'A1') {
+      final selectedLang = ref.read(languageProvider);
+      final levels = kPuzzleLevelsByLanguage[selectedLang.code];
+      if (levels != null) {
+        await ref.read(sagaProvider.notifier).completeLevelsUpToCefr(
+          levels, _selectedCefr, selectedLang.code,
+        );
+      }
+    }
 
     // Save Gemini API key via ApiKeyService (secure storage + Supabase sync).
     if (_geminiApiKey.trim().isNotEmpty) {
@@ -126,6 +143,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       'consent_partner_profile': _consentPartner,
       'policy_version':          _kPolicyVersion,
       'daily_goal_xp':           _selectedGoalXp,
+      'starting_cefr':           _selectedCefr,
     });
 
     if (!mounted) return;
@@ -177,6 +195,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   const _WelcomePage(),
                   const _HowItWorksPage(),
                   const _ChooseLanguagePage(),
+                  _SkillLevelPage(
+                    selectedCefr: _selectedCefr,
+                    onCefrSelected: (v) => setState(() => _selectedCefr = v),
+                  ),
                   _DailyGoalPage(
                     selectedGoalXp: _selectedGoalXp,
                     onGoalSelected: (v) => setState(() => _selectedGoalXp = v),
@@ -195,10 +217,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             ),
             _BottomBar(
               currentPage:    _currentPage,
-              totalPages:     6,
+              totalPages:     7,
               onContinue:     _next,
               onBack:         _prev,
-              continueLabel:  _currentPage == 4 ? 'Skip' : null,
+              continueLabel:  _currentPage == 5 ? 'Skip' : null,
             ),
           ],
         ),
@@ -1016,6 +1038,123 @@ class _ConsentToggle extends StatelessWidget {
     ).animate(delay: Duration(milliseconds: delay))
         .fadeIn(duration: 300.ms)
         .slideY(begin: 0.06, end: 0);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Skill Level Page
+// ---------------------------------------------------------------------------
+
+class _SkillLevelPage extends StatelessWidget {
+  const _SkillLevelPage({
+    required this.selectedCefr,
+    required this.onCefrSelected,
+  });
+
+  final String selectedCefr;
+  final ValueChanged<String> onCefrSelected;
+
+  static const _options = [
+    (cefr: 'A1', emoji: '🌱', label: 'Nybörjare',        sub: 'Jag kan inga ord alls'),
+    (cefr: 'A2', emoji: '📖', label: 'Lite grunder',     sub: 'Jag kan hälsa och räkna'),
+    (cefr: 'B1', emoji: '💬', label: 'Ganska flytande',  sub: 'Jag klarar enkla samtal'),
+    (cefr: 'B2', emoji: '🎓', label: 'Avancerad',        sub: 'Jag läser och skriver väl'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: FlickSpacing.xl,
+        vertical:   FlickSpacing.xl,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Hur bra kan du språket?',
+            style: Theme.of(context).textTheme.displaySmall,
+          ).animate().fadeIn(duration: 300.ms),
+          const SizedBox(height: FlickSpacing.sm),
+          Text(
+            'Vi börjar på rätt ställe direkt.',
+            style: Theme.of(context).textTheme.bodyLarge!
+                .copyWith(color: FlickColors.textSecondary),
+          ).animate().fadeIn(delay: 80.ms, duration: 300.ms),
+          const SizedBox(height: FlickSpacing.xl),
+          ..._options.asMap().entries.map((e) {
+            final opt      = e.value;
+            final selected = opt.cefr == selectedCefr;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: FlickSpacing.md),
+              child: GestureDetector(
+                onTap: () => onCefrSelected(opt.cefr),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.all(FlickSpacing.md),
+                  decoration: BoxDecoration(
+                    color: selected ? FlickColors.primaryDim : FlickColors.surface,
+                    borderRadius: const BorderRadius.all(FlickRadius.lg),
+                    border: Border.all(
+                      color: selected ? FlickColors.primary : FlickColors.border,
+                      width: selected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(opt.emoji,
+                          style: const TextStyle(fontSize: 28)),
+                      const SizedBox(width: FlickSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(opt.label,
+                                style: Theme.of(context).textTheme.labelLarge),
+                            Text(opt.sub,
+                                style: Theme.of(context).textTheme.bodyMedium!
+                                    .copyWith(color: FlickColors.textSecondary)),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? FlickColors.primary
+                              : FlickColors.surfaceDim,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          opt.cefr,
+                          style: TextStyle(
+                            fontSize:   11,
+                            fontWeight: FontWeight.w700,
+                            color: selected
+                                ? Colors.white
+                                : FlickColors.textMuted,
+                          ),
+                        ),
+                      ),
+                      if (selected) ...[
+                        const SizedBox(width: FlickSpacing.sm),
+                        const Icon(Icons.check_circle_rounded,
+                            color: FlickColors.primary, size: 20),
+                      ],
+                    ],
+                  ),
+                ),
+              )
+                  .animate(
+                      delay: Duration(milliseconds: 160 + e.key * 80))
+                  .fadeIn(duration: 250.ms)
+                  .slideY(begin: 0.06, end: 0, duration: 250.ms),
+            );
+          }),
+        ],
+      ),
+    );
   }
 }
 

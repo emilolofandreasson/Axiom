@@ -368,6 +368,30 @@ class SagaNotifier extends Notifier<SagaState> {
     await _save();
   }
 
+  /// Auto-completar alla PuzzleLevels vars cefrLevel är STRIKT LÄGRE än
+  /// [targetCefr] och som inte redan är completade.
+  /// Ger ingen XP och uppdaterar inte streak — används vid onboarding-skip
+  /// och streak-acceleration.
+  Future<void> completeLevelsUpToCefr(
+    List<PuzzleLevel> levels,
+    String targetCefr,
+    String languageCode,
+  ) async {
+    final toComplete = levels
+        .where((l) =>
+            cefrOrder(l.cefrLevel) < cefrOrder(targetCefr) &&
+            !state.completedIds.contains(l.id))
+        .map((l) => l.id)
+        .toSet();
+
+    if (toComplete.isEmpty) return;
+
+    state = state.copyWith(
+      completedIds: {...state.completedIds, ...toComplete},
+    );
+    await _save();
+  }
+
   Future<bool> useRevealPowerup() async {
     if (state.revealPowerups <= 0) return false;
     state = state.copyWith(revealPowerups: state.revealPowerups - 1);

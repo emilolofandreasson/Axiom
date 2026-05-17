@@ -19,6 +19,15 @@ class DailyLessonScreen extends ConsumerWidget {
     final state = ref.watch(lessonProvider);
     final notifier = ref.read(lessonProvider.notifier);
 
+    // Listen for CEFR acceleration trigger — auto-dismiss banner after 3s.
+    ref.listen<LessonState>(lessonProvider, (prev, next) {
+      if (prev?.accelerationCefr == null && next.accelerationCefr != null) {
+        Future.delayed(const Duration(seconds: 3), () {
+          if (context.mounted) notifier.clearAccelerationBanner();
+        });
+      }
+    });
+
     // Route to completion screen when done.
     if (state.status == LessonStatus.completed) {
       return LessonCompleteScreen(
@@ -64,39 +73,45 @@ class DailyLessonScreen extends ConsumerWidget {
         progress:     state.progressFraction,
         onClose:      () => _confirmExit(context, ref),
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: FlickSpacing.lg),
-          child: Column(
-            children: [
-              const SizedBox(height: FlickSpacing.md),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: FlickSpacing.lg),
+              child: Column(
+                children: [
+                  const SizedBox(height: FlickSpacing.md),
 
-              // CEFR + skill badge row
-              _LessonMeta(
-                cefrLevel: state.currentQuestion.cefrLevel,
-                skillTag:  state.currentQuestion.skillTag,
-                qIndex:    state.currentIndex,
-                qTotal:    state.totalQuestions,
+                  // CEFR + skill badge row
+                  _LessonMeta(
+                    cefrLevel: state.currentQuestion.cefrLevel,
+                    skillTag:  state.currentQuestion.skillTag,
+                    qIndex:    state.currentIndex,
+                    qTotal:    state.totalQuestions,
+                  ),
+
+                  const SizedBox(height: FlickSpacing.lg),
+
+                  // Exercise body
+                  Expanded(
+                    child: _ExerciseBody(
+                      key:      ValueKey('${state.lesson.id}_${state.currentIndex}'),
+                      state:    state,
+                      notifier: notifier,
+                    ),
+                  ),
+
+                  // Continue button — only shown after answering MC/WO.
+                  _ContinueButton(state: state, notifier: notifier),
+
+                  const SizedBox(height: FlickSpacing.lg),
+                ],
               ),
-
-              const SizedBox(height: FlickSpacing.lg),
-
-              // Exercise body
-              Expanded(
-                child: _ExerciseBody(
-                  key:      ValueKey('${state.lesson.id}_${state.currentIndex}'),
-                  state:    state,
-                  notifier: notifier,
-                ),
-              ),
-
-              // Continue button — only shown after answering MC/WO.
-              _ContinueButton(state: state, notifier: notifier),
-
-              const SizedBox(height: FlickSpacing.lg),
-            ],
+            ),
           ),
-        ),
+          if (state.accelerationCefr != null)
+            _CefrUpgradeBanner(cefrLevel: state.accelerationCefr!),
+        ],
       ),
     );
   }
@@ -565,6 +580,60 @@ class _LessonIntroScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// CEFR Upgrade Banner
+// ---------------------------------------------------------------------------
+
+class _CefrUpgradeBanner extends StatelessWidget {
+  const _CefrUpgradeBanner({required this.cefrLevel});
+  final String cefrLevel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(
+            FlickSpacing.lg, FlickSpacing.md, FlickSpacing.lg, 0),
+        padding: const EdgeInsets.symmetric(
+            horizontal: FlickSpacing.md, vertical: FlickSpacing.sm),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFF6B35),
+          borderRadius: const BorderRadius.all(FlickRadius.lg),
+          boxShadow: [
+            BoxShadow(
+              color:      Colors.orange.withValues(alpha: 0.35),
+              blurRadius: 16,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const Text('🔥', style: TextStyle(fontSize: 22)),
+            const SizedBox(width: FlickSpacing.sm),
+            Expanded(
+              child: Text(
+                'Du är varm! Hoppar upp till $cefrLevel',
+                style: const TextStyle(
+                  color:      Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize:   14,
+                ),
+              ),
+            ),
+          ],
+        ),
+      )
+          .animate()
+          .fadeIn(duration: 300.ms)
+          .slideY(begin: -0.3, end: 0, curve: Curves.easeOut),
     );
   }
 }

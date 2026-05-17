@@ -71,3 +71,13 @@ String cefrCodeForXp(int xp) => levelForXp(xp).cefrCode;
 
 /// Human-readable sub-level label, e.g. "B1.2".
 String levelLabelForXp(int xp) => levelForXp(xp).label;
+
+/// Numerisk ordning för CEFR-strängar. Används för jämförelser.
+int cefrOrder(String cefr) => const {
+  'A1': 0, 'A2': 1, 'B1': 2, 'B2': 3, 'C1': 4, 'C2': 5,
+}[cefr] ?? 0;
+
+/// Nästa CEFR-nivå i ordningen, eller null om C2.
+String? nextCefrLevel(String cefr) => const {
+  'A1': 'A2', 'A2': 'B1', 'B1': 'B2', 'B2': 'C1', 'C1': 'C2',
+}[cefr];

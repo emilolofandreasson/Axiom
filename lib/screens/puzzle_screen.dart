@@ -5,9 +5,14 @@ import 'package:flick_sdk/flick_sdk.dart';
 import '../core/theme/app_theme.dart';
 import '../models/puzzle_level.dart';
 import '../models/language_level.dart';
+import '../models/question.dart';
 import '../providers/language_provider.dart';
+import '../providers/lesson_provider.dart' show AnswerState;
 import '../providers/saga_provider.dart';
 import '../widgets/puzzle/match_grid.dart';
+import '../widgets/exercises/multiple_choice_card.dart';
+import '../widgets/exercises/word_order_puzzle.dart';
+import '../main.dart' show questionLibrary;
 
 class PuzzleScreen extends ConsumerStatefulWidget {
   const PuzzleScreen({super.key, required this.level});
@@ -19,32 +24,53 @@ class PuzzleScreen extends ConsumerStatefulWidget {
 }
 
 class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
-  int  _attempt  = 1;
-  bool _complete = false;
+  int  _attempt     = 1;
+  bool _complete    = false;
   int  _timeSeconds = 0;
 
-  void _onLevelComplete(int timeSeconds) {
+  // Quiz phase
+  bool           _matchComplete   = false;
+  List<Question> _quizQuestions   = [];
+  int            _quizIndex       = 0;
+  AnswerState    _quizAnswerState = AnswerState.unanswered;
+
+  Future<void> _onMatchComplete(int timeSeconds) async {
+    setState(() { _timeSeconds = timeSeconds; _matchComplete = true; });
+
+    final questions = await questionLibrary.fetchForLevel(
+      languageCode: widget.level.courseLanguage,
+      cefrLevel:    widget.level.cefrLevel,
+    );
+
+    if (questions.isEmpty) {
+      _completeLevel();
+      return;
+    }
     setState(() {
-      _complete     = true;
-      _timeSeconds  = timeSeconds;
+      _quizQuestions  = questions;
+      _quizIndex      = 0;
+      _quizAnswerState = AnswerState.unanswered;
     });
+  }
 
-    final langCode  = ref.read(languageProvider).code;
-    final langXp    = ref.read(sagaProvider).xpForLanguage(langCode);
-    final xpReward  = levelForXp(langXp).xpReward;
+  void _completeLevel() {
+    setState(() => _complete = true);
+    final langCode = ref.read(languageProvider).code;
+    final langXp   = ref.read(sagaProvider).xpForLanguage(langCode);
+    final xpReward = levelForXp(langXp).xpReward;
     ref.read(sagaProvider.notifier).completeLevel(
-          widget.level.id,
-          xpReward,
-          languageCode: langCode,
-        );
-
+      widget.level.id,
+      xpReward,
+      languageCode: langCode,
+    );
     EventSensor.instance.emit('level_completed', {
       'lesson_id':       widget.level.id,
       'cefr_level':      widget.level.cefrLevel,
       'course_language': widget.level.courseLanguage,
       'attempts':        _attempt,
-      'time_seconds':    timeSeconds,
+      'time_seconds':    _timeSeconds,
       'xp_earned':       xpReward,
+      'quiz_questions':  _quizQuestions.length,
     });
   }
 
@@ -56,12 +82,58 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
     ref.read(sagaProvider.notifier).recordRetry(widget.level.id);
     setState(() {
       _attempt++;
-      _complete = false;
+      _complete      = false;
+      _matchComplete = false;
+      _quizQuestions = [];
+      _quizIndex     = 0;
+      _quizAnswerState = AnswerState.unanswered;
     });
   }
 
   void _onUseReveal() {
     ref.read(sagaProvider.notifier).useRevealPowerup();
+  }
+
+  void _onQuizAnswer(Object answer) {
+    final q = _quizQuestions[_quizIndex];
+    final isCorrect = switch (q) {
+      MultipleChoiceQuestion mc =>
+          answer is int && answer == mc.correctIndex,
+      WordOrderQuestion wo =>
+          answer is List<String> &&
+          _listEquals(answer, wo.correctSentence),
+      _ => false,
+    };
+
+    setState(() => _quizAnswerState =
+        isCorrect ? AnswerState.correct : AnswerState.wrong);
+
+    if (q.globalId != null) {
+      questionLibrary.recordAnswer(
+        questionId: q.globalId!,
+        isCorrect:  isCorrect,
+        lessonId:   'path-${widget.level.id}',
+      );
+    }
+  }
+
+  void _onQuizAdvance() {
+    if (_quizIndex >= _quizQuestions.length - 1) {
+      _completeLevel();
+      return;
+    }
+    setState(() {
+      _quizIndex++;
+      _quizAnswerState = AnswerState.unanswered;
+    });
+  }
+
+  bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   @override
@@ -74,6 +146,17 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
         timeSeconds: _timeSeconds,
         attempts:    _attempt,
         onContinue:  () => Navigator.pop(context),
+      );
+    }
+
+    if (_matchComplete && _quizQuestions.isNotEmpty) {
+      return _QuizPhase(
+        level:       widget.level,
+        questions:   _quizQuestions,
+        index:       _quizIndex,
+        answerState: _quizAnswerState,
+        onAnswer:    _onQuizAnswer,
+        onAdvance:   _onQuizAdvance,
       );
     }
 
@@ -142,7 +225,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                 child: MatchGrid(
                   key:             ValueKey(_attempt),
                   level:           widget.level,
-                  onLevelComplete: _onLevelComplete,
+                  onLevelComplete: _onMatchComplete,
                   onRetry:         _onRetry,
                   revealCount:     saga.revealPowerups,
                   onUseReveal:     _onUseReveal,
@@ -155,6 +238,102 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Quiz phase
+// ---------------------------------------------------------------------------
+
+class _QuizPhase extends StatelessWidget {
+  const _QuizPhase({
+    required this.level,
+    required this.questions,
+    required this.index,
+    required this.answerState,
+    required this.onAnswer,
+    required this.onAdvance,
+  });
+
+  final PuzzleLevel      level;
+  final List<Question>   questions;
+  final int              index;
+  final AnswerState      answerState;
+  final ValueChanged<Object> onAnswer;
+  final VoidCallback         onAdvance;
+
+  @override
+  Widget build(BuildContext context) {
+    final q          = questions[index];
+    final isAnswered = answerState != AnswerState.unanswered;
+    final total      = questions.length;
+    final progress   = (index + (isAnswered ? 1 : 0)) / total;
+
+    return Scaffold(
+      backgroundColor: FlickColors.background,
+      appBar: AppBar(
+        title: Text('Practice — ${index + 1} / $total'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(4),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            height: 4,
+            child: LinearProgressIndicator(
+              value:           progress,
+              backgroundColor: FlickColors.surfaceDim,
+              color:           FlickColors.primary,
+            ),
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: FlickSpacing.lg,
+            vertical:   FlickSpacing.md,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: switch (q) {
+                  MultipleChoiceQuestion mc => MultipleChoiceCard(
+                      question:    mc,
+                      answerState: answerState,
+                      onAnswer:    (i) => onAnswer(i),
+                    ),
+                  WordOrderQuestion wo => WordOrderPuzzle(
+                      question:    wo,
+                      answerState: answerState,
+                      onAnswer:    (words) => onAnswer(words),
+                    ),
+                  _ => const SizedBox.shrink(),
+                },
+              ),
+
+              if (isAnswered) ...[
+                const SizedBox(height: FlickSpacing.md),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: onAdvance,
+                    child: Text(
+                      index >= questions.length - 1 ? 'Finish' : 'Continue',
+                    ),
+                  ),
+                ).animate().fadeIn(duration: 250.ms).slideY(begin: 0.1),
+              ],
+
+              const SizedBox(height: FlickSpacing.lg),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 String _formatTime(int seconds) {
   if (seconds < 60) return '${seconds}s';
@@ -194,12 +373,11 @@ class _CompletionScreen extends StatelessWidget {
             children: [
               const Spacer(),
 
-              // Trophy
               Container(
                 width: 80, height: 80,
                 decoration: const BoxDecoration(
-                  color:  FlickColors.primaryDim,
-                  shape:  BoxShape.circle,
+                  color: FlickColors.primaryDim,
+                  shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.emoji_events_rounded,
                     size: 40, color: FlickColors.primary),
@@ -251,7 +429,6 @@ class _CompletionScreen extends StatelessWidget {
 
               const SizedBox(height: FlickSpacing.xl),
 
-              // Stats
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [

@@ -49,6 +49,33 @@ class QuestionLibraryService {
     }
   }
 
+  /// Fetches up to [limit] non-answered questions for a Path level.
+  /// Filters by language + CEFR only — no skill_tag constraint.
+  /// Returns empty list on error or if bank has no content for this level.
+  Future<List<Question>> fetchForLevel({
+    required String languageCode,
+    required String cefrLevel,
+    int limit = 5,
+  }) async {
+    try {
+      final uid  = _db.auth.currentUser?.id;
+      final rows = await _db.rpc('fetch_questions_for_level', params: {
+        'p_user_id':    uid,
+        'p_language':   languageCode,
+        'p_cefr_level': cefrLevel,
+        'p_limit':      limit,
+      });
+      if (rows == null) return [];
+      return (rows as List)
+          .map((r) => _rowToQuestion(r as Map<String, dynamic>))
+          .whereType<Question>()
+          .toList();
+    } catch (e) {
+      debugPrint('[QuestionLibrary] fetchForLevel error: $e');
+      return [];
+    }
+  }
+
   // ── Write ───────────────────────────────────────────────────────────────────
 
   /// Saves a batch of JSON questions (Gemini output format) to the library.

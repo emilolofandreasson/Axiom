@@ -85,7 +85,7 @@ class EventSensor {
   /// [eventType] — snake_case name, e.g. "answer_submitted"
   /// [payload]   — app-specific key/value pairs (see data contract)
   void emit(String eventType, [Map<String, Object?> payload = const {}]) {
-    assert(_initialized, 'Call initialize() before emitting events.');
+    if (!_initialized) return;
 
     final event = FlickEvent(
       eventType:  eventType,

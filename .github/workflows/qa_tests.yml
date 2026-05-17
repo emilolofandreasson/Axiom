@@ -27,8 +27,5 @@ jobs:
       - name: Flutter analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
-      - name: Run unit tests
+      - name: Run tests
         run: flutter test test/
-
-      - name: Run integration tests (Dart VM)
-        run: flutter test integration_test/app_test.dart

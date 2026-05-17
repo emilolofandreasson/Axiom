@@ -26,12 +26,30 @@ import 'profile_screen.dart';
 
 String _greeting(String langCode) {
   final h = DateTime.now().hour;
-  return switch (langCode) {
-    'es' => h < 12 ? 'Buenos días.' : h < 20 ? 'Buenas tardes.' : 'Buenas noches.',
-    'fr' => h < 12 ? 'Bonjour.' : h < 20 ? 'Bon après-midi.' : 'Bonsoir.',
-    'de' => h < 12 ? 'Guten Morgen.' : h < 20 ? 'Guten Tag.' : 'Guten Abend.',
-    _    => h < 12 ? 'Good morning.' : h < 20 ? 'Good afternoon.' : 'Good evening.',
+  final (m, a, e) = switch (langCode) {
+    'es' => ('Buenos días.',     'Buenas tardes.',     'Buenas noches.'),
+    'fr' => ('Bonjour.',         'Bon après-midi.',    'Bonsoir.'),
+    'de' => ('Guten Morgen.',    'Guten Tag.',         'Guten Abend.'),
+    'it' => ('Buongiorno.',      'Buon pomeriggio.',   'Buonasera.'),
+    'pt' => ('Bom dia.',         'Boa tarde.',         'Boa noite.'),
+    'ja' => ('おはようございます。',   'こんにちは。',          'こんばんは。'),
+    'ko' => ('좋은 아침이에요.',     '안녕하세요.',           '좋은 저녁이에요.'),
+    'zh' => ('早上好。',           '下午好。',              '晚上好。'),
+    'ar' => ('صباح الخير.',      'مساء النهار.',       'مساء الخير.'),
+    'ru' => ('Доброе утро.',     'Добрый день.',       'Добрый вечер.'),
+    'nl' => ('Goedemorgen.',     'Goedemiddag.',       'Goedenavond.'),
+    'sv' => ('God morgon.',      'God eftermiddag.',   'God kväll.'),
+    'no' => ('God morgen.',      'God ettermiddag.',   'God kveld.'),
+    'da' => ('God morgen.',      'God eftermiddag.',   'God aften.'),
+    'pl' => ('Dzień dobry.',     'Dzień dobry.',       'Dobry wieczór.'),
+    'tr' => ('Günaydın.',        'İyi öğleden sonra.', 'İyi akşamlar.'),
+    'hi' => ('सुप्रभात।',         'नमस्ते।',             'शुभ संध्या।'),
+    'el' => ('Καλημέρα.',        'Καλό απόγευμα.',     'Καλησπέρα.'),
+    'he' => ('בוקר טוב.',        'צהריים טובים.',      'ערב טוב.'),
+    'vi' => ('Chào buổi sáng.', 'Chào buổi chiều.',  'Chào buổi tối.'),
+    _    => ('Good morning.',    'Good afternoon.',    'Good evening.'),
   };
+  return h < 12 ? m : h < 20 ? a : e;
 }
 
 WordPair? _wordOfDay(String langCode) {

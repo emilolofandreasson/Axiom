@@ -55,9 +55,25 @@ TARGETS = [
     ("es", "A1"), ("es", "A2"), ("es", "B1"), ("es", "B2"),
     ("fr", "A1"), ("fr", "A2"), ("fr", "B1"),
     ("de", "A1"), ("de", "A2"), ("de", "B1"),
+    ("it", "A1"), ("it", "A2"),
+    ("pt", "A1"), ("pt", "A2"),
+    ("ja", "A1"), ("ja", "A2"),
+    ("ko", "A1"), ("ko", "A2"),
+    ("zh", "A1"), ("zh", "A2"),
+    ("ru", "A1"), ("ru", "A2"),
+    ("nl", "A1"), ("sv", "A1"), ("no", "A1"),
+    ("da", "A1"), ("pl", "A1"), ("tr", "A1"),
 ]
 
-LANGUAGE_NAMES = {"es": "Spanish", "fr": "French", "de": "German"}
+LANGUAGE_NAMES = {
+    "es": "Spanish",        "fr": "French",          "de": "German",
+    "it": "Italian",        "pt": "Portuguese",      "ja": "Japanese",
+    "ko": "Korean",         "zh": "Mandarin Chinese", "ar": "Arabic",
+    "ru": "Russian",        "nl": "Dutch",           "sv": "Swedish",
+    "no": "Norwegian",      "da": "Danish",          "pl": "Polish",
+    "tr": "Turkish",        "hi": "Hindi",           "el": "Greek",
+    "he": "Hebrew",         "vi": "Vietnamese",
+}
 
 # Skill tags rotated per CEFR level to ensure diverse vocabulary
 SKILL_TAGS_BY_CEFR = {

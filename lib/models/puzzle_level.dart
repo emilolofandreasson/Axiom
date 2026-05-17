@@ -580,8 +580,304 @@ const kGermanPuzzleLevels = [
   ),
 ];
 
+// ---------------------------------------------------------------------------
+// Italian A1/A2 vocabulary path
+// ---------------------------------------------------------------------------
+const kItalianPuzzleLevels = [
+  PuzzleLevel(
+    id: 'it-puzzle-01', levelNumber: 1, title: 'Greetings',
+    courseLanguage: 'it', cefrLevel: 'A1', xpReward: 20,
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Hello',     targetWord: 'Ciao'),
+      WordPair(id: 'p2', sourceWord: 'Goodbye',   targetWord: 'Arrivederci'),
+      WordPair(id: 'p3', sourceWord: 'Please',    targetWord: 'Per favore'),
+      WordPair(id: 'p4', sourceWord: 'Thank you', targetWord: 'Grazie'),
+      WordPair(id: 'p5', sourceWord: 'Yes',       targetWord: 'Sì'),
+      WordPair(id: 'p6', sourceWord: 'No',        targetWord: 'No'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'it-puzzle-02', levelNumber: 2, title: 'Numbers',
+    courseLanguage: 'it', cefrLevel: 'A1', xpReward: 20,
+    unlocksAfter: 'it-puzzle-01',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'One',   targetWord: 'Uno'),
+      WordPair(id: 'p2', sourceWord: 'Two',   targetWord: 'Due'),
+      WordPair(id: 'p3', sourceWord: 'Three', targetWord: 'Tre'),
+      WordPair(id: 'p4', sourceWord: 'Four',  targetWord: 'Quattro'),
+      WordPair(id: 'p5', sourceWord: 'Five',  targetWord: 'Cinque'),
+      WordPair(id: 'p6', sourceWord: 'Six',   targetWord: 'Sei'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'it-puzzle-03', levelNumber: 3, title: 'Colors',
+    courseLanguage: 'it', cefrLevel: 'A1', xpReward: 25,
+    unlocksAfter: 'it-puzzle-02',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Red',    targetWord: 'Rosso'),
+      WordPair(id: 'p2', sourceWord: 'Blue',   targetWord: 'Blu'),
+      WordPair(id: 'p3', sourceWord: 'Green',  targetWord: 'Verde'),
+      WordPair(id: 'p4', sourceWord: 'Yellow', targetWord: 'Giallo'),
+      WordPair(id: 'p5', sourceWord: 'Black',  targetWord: 'Nero'),
+      WordPair(id: 'p6', sourceWord: 'White',  targetWord: 'Bianco'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'it-puzzle-04', levelNumber: 4, title: 'Food & Drink',
+    courseLanguage: 'it', cefrLevel: 'A2', xpReward: 30,
+    unlocksAfter: 'it-puzzle-03',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Water',  targetWord: 'Acqua'),
+      WordPair(id: 'p2', sourceWord: 'Bread',  targetWord: 'Pane'),
+      WordPair(id: 'p3', sourceWord: 'Cheese', targetWord: 'Formaggio'),
+      WordPair(id: 'p4', sourceWord: 'Coffee', targetWord: 'Caffè'),
+      WordPair(id: 'p5', sourceWord: 'Wine',   targetWord: 'Vino'),
+      WordPair(id: 'p6', sourceWord: 'Pizza',  targetWord: 'Pizza'),
+    ],
+  ),
+];
+
+// ---------------------------------------------------------------------------
+// Portuguese A1/A2 vocabulary path
+// ---------------------------------------------------------------------------
+const kPortuguesePuzzleLevels = [
+  PuzzleLevel(
+    id: 'pt-puzzle-01', levelNumber: 1, title: 'Greetings',
+    courseLanguage: 'pt', cefrLevel: 'A1', xpReward: 20,
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Hello',     targetWord: 'Olá'),
+      WordPair(id: 'p2', sourceWord: 'Goodbye',   targetWord: 'Tchau'),
+      WordPair(id: 'p3', sourceWord: 'Please',    targetWord: 'Por favor'),
+      WordPair(id: 'p4', sourceWord: 'Thank you', targetWord: 'Obrigado'),
+      WordPair(id: 'p5', sourceWord: 'Yes',       targetWord: 'Sim'),
+      WordPair(id: 'p6', sourceWord: 'No',        targetWord: 'Não'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'pt-puzzle-02', levelNumber: 2, title: 'Numbers',
+    courseLanguage: 'pt', cefrLevel: 'A1', xpReward: 20,
+    unlocksAfter: 'pt-puzzle-01',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'One',   targetWord: 'Um'),
+      WordPair(id: 'p2', sourceWord: 'Two',   targetWord: 'Dois'),
+      WordPair(id: 'p3', sourceWord: 'Three', targetWord: 'Três'),
+      WordPair(id: 'p4', sourceWord: 'Four',  targetWord: 'Quatro'),
+      WordPair(id: 'p5', sourceWord: 'Five',  targetWord: 'Cinco'),
+      WordPair(id: 'p6', sourceWord: 'Six',   targetWord: 'Seis'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'pt-puzzle-03', levelNumber: 3, title: 'Colors',
+    courseLanguage: 'pt', cefrLevel: 'A1', xpReward: 25,
+    unlocksAfter: 'pt-puzzle-02',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Red',    targetWord: 'Vermelho'),
+      WordPair(id: 'p2', sourceWord: 'Blue',   targetWord: 'Azul'),
+      WordPair(id: 'p3', sourceWord: 'Green',  targetWord: 'Verde'),
+      WordPair(id: 'p4', sourceWord: 'Yellow', targetWord: 'Amarelo'),
+      WordPair(id: 'p5', sourceWord: 'Black',  targetWord: 'Preto'),
+      WordPair(id: 'p6', sourceWord: 'White',  targetWord: 'Branco'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'pt-puzzle-04', levelNumber: 4, title: 'Food & Drink',
+    courseLanguage: 'pt', cefrLevel: 'A2', xpReward: 30,
+    unlocksAfter: 'pt-puzzle-03',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Water',  targetWord: 'Água'),
+      WordPair(id: 'p2', sourceWord: 'Bread',  targetWord: 'Pão'),
+      WordPair(id: 'p3', sourceWord: 'Meat',   targetWord: 'Carne'),
+      WordPair(id: 'p4', sourceWord: 'Fruit',  targetWord: 'Fruta'),
+      WordPair(id: 'p5', sourceWord: 'Milk',   targetWord: 'Leite'),
+      WordPair(id: 'p6', sourceWord: 'Coffee', targetWord: 'Café'),
+    ],
+  ),
+];
+
+// ---------------------------------------------------------------------------
+// Japanese A1 vocabulary path
+// ---------------------------------------------------------------------------
+const kJapanesePuzzleLevels = [
+  PuzzleLevel(
+    id: 'ja-puzzle-01', levelNumber: 1, title: 'Greetings',
+    courseLanguage: 'ja', cefrLevel: 'A1', xpReward: 20,
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Hello',        targetWord: 'こんにちは'),
+      WordPair(id: 'p2', sourceWord: 'Good morning', targetWord: 'おはよう'),
+      WordPair(id: 'p3', sourceWord: 'Good evening', targetWord: 'こんばんは'),
+      WordPair(id: 'p4', sourceWord: 'Thank you',    targetWord: 'ありがとう'),
+      WordPair(id: 'p5', sourceWord: 'Yes',          targetWord: 'はい'),
+      WordPair(id: 'p6', sourceWord: 'No',           targetWord: 'いいえ'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'ja-puzzle-02', levelNumber: 2, title: 'Numbers',
+    courseLanguage: 'ja', cefrLevel: 'A1', xpReward: 20,
+    unlocksAfter: 'ja-puzzle-01',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'One',   targetWord: 'いち'),
+      WordPair(id: 'p2', sourceWord: 'Two',   targetWord: 'に'),
+      WordPair(id: 'p3', sourceWord: 'Three', targetWord: 'さん'),
+      WordPair(id: 'p4', sourceWord: 'Four',  targetWord: 'し'),
+      WordPair(id: 'p5', sourceWord: 'Five',  targetWord: 'ご'),
+      WordPair(id: 'p6', sourceWord: 'Six',   targetWord: 'ろく'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'ja-puzzle-03', levelNumber: 3, title: 'Food',
+    courseLanguage: 'ja', cefrLevel: 'A1', xpReward: 25,
+    unlocksAfter: 'ja-puzzle-02',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Rice',   targetWord: 'ごはん'),
+      WordPair(id: 'p2', sourceWord: 'Sushi',  targetWord: 'すし'),
+      WordPair(id: 'p3', sourceWord: 'Water',  targetWord: 'みず'),
+      WordPair(id: 'p4', sourceWord: 'Bread',  targetWord: 'パン'),
+      WordPair(id: 'p5', sourceWord: 'Ramen',  targetWord: 'ラーメン'),
+      WordPair(id: 'p6', sourceWord: 'Tea',    targetWord: 'おちゃ'),
+    ],
+  ),
+];
+
+// ---------------------------------------------------------------------------
+// Korean A1 vocabulary path
+// ---------------------------------------------------------------------------
+const kKoreanPuzzleLevels = [
+  PuzzleLevel(
+    id: 'ko-puzzle-01', levelNumber: 1, title: 'Greetings',
+    courseLanguage: 'ko', cefrLevel: 'A1', xpReward: 20,
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Hello',     targetWord: '안녕하세요'),
+      WordPair(id: 'p2', sourceWord: 'Goodbye',   targetWord: '안녕히 가세요'),
+      WordPair(id: 'p3', sourceWord: 'Thank you', targetWord: '감사합니다'),
+      WordPair(id: 'p4', sourceWord: 'Please',    targetWord: '주세요'),
+      WordPair(id: 'p5', sourceWord: 'Yes',       targetWord: '네'),
+      WordPair(id: 'p6', sourceWord: 'No',        targetWord: '아니요'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'ko-puzzle-02', levelNumber: 2, title: 'Numbers',
+    courseLanguage: 'ko', cefrLevel: 'A1', xpReward: 20,
+    unlocksAfter: 'ko-puzzle-01',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'One',   targetWord: '일'),
+      WordPair(id: 'p2', sourceWord: 'Two',   targetWord: '이'),
+      WordPair(id: 'p3', sourceWord: 'Three', targetWord: '삼'),
+      WordPair(id: 'p4', sourceWord: 'Four',  targetWord: '사'),
+      WordPair(id: 'p5', sourceWord: 'Five',  targetWord: '오'),
+      WordPair(id: 'p6', sourceWord: 'Six',   targetWord: '육'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'ko-puzzle-03', levelNumber: 3, title: 'Food',
+    courseLanguage: 'ko', cefrLevel: 'A1', xpReward: 25,
+    unlocksAfter: 'ko-puzzle-02',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Rice',   targetWord: '밥'),
+      WordPair(id: 'p2', sourceWord: 'Water',  targetWord: '물'),
+      WordPair(id: 'p3', sourceWord: 'Kimchi', targetWord: '김치'),
+      WordPair(id: 'p4', sourceWord: 'Bread',  targetWord: '빵'),
+      WordPair(id: 'p5', sourceWord: 'Meat',   targetWord: '고기'),
+      WordPair(id: 'p6', sourceWord: 'Fruit',  targetWord: '과일'),
+    ],
+  ),
+];
+
+// ---------------------------------------------------------------------------
+// Mandarin Chinese A1 vocabulary path
+// ---------------------------------------------------------------------------
+const kMandarinPuzzleLevels = [
+  PuzzleLevel(
+    id: 'zh-puzzle-01', levelNumber: 1, title: 'Greetings',
+    courseLanguage: 'zh', cefrLevel: 'A1', xpReward: 20,
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Hello',     targetWord: '你好'),
+      WordPair(id: 'p2', sourceWord: 'Goodbye',   targetWord: '再见'),
+      WordPair(id: 'p3', sourceWord: 'Thank you', targetWord: '谢谢'),
+      WordPair(id: 'p4', sourceWord: 'Please',    targetWord: '请'),
+      WordPair(id: 'p5', sourceWord: 'Yes',       targetWord: '是'),
+      WordPair(id: 'p6', sourceWord: 'No',        targetWord: '不是'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'zh-puzzle-02', levelNumber: 2, title: 'Numbers',
+    courseLanguage: 'zh', cefrLevel: 'A1', xpReward: 20,
+    unlocksAfter: 'zh-puzzle-01',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'One',   targetWord: '一'),
+      WordPair(id: 'p2', sourceWord: 'Two',   targetWord: '二'),
+      WordPair(id: 'p3', sourceWord: 'Three', targetWord: '三'),
+      WordPair(id: 'p4', sourceWord: 'Four',  targetWord: '四'),
+      WordPair(id: 'p5', sourceWord: 'Five',  targetWord: '五'),
+      WordPair(id: 'p6', sourceWord: 'Six',   targetWord: '六'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'zh-puzzle-03', levelNumber: 3, title: 'Food',
+    courseLanguage: 'zh', cefrLevel: 'A1', xpReward: 25,
+    unlocksAfter: 'zh-puzzle-02',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Rice',     targetWord: '米饭'),
+      WordPair(id: 'p2', sourceWord: 'Water',    targetWord: '水'),
+      WordPair(id: 'p3', sourceWord: 'Noodles',  targetWord: '面条'),
+      WordPair(id: 'p4', sourceWord: 'Tea',      targetWord: '茶'),
+      WordPair(id: 'p5', sourceWord: 'Bread',    targetWord: '面包'),
+      WordPair(id: 'p6', sourceWord: 'Dumpling', targetWord: '饺子'),
+    ],
+  ),
+];
+
+// ---------------------------------------------------------------------------
+// Russian A1 vocabulary path
+// ---------------------------------------------------------------------------
+const kRussianPuzzleLevels = [
+  PuzzleLevel(
+    id: 'ru-puzzle-01', levelNumber: 1, title: 'Greetings',
+    courseLanguage: 'ru', cefrLevel: 'A1', xpReward: 20,
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Hello',     targetWord: 'Привет'),
+      WordPair(id: 'p2', sourceWord: 'Goodbye',   targetWord: 'До свидания'),
+      WordPair(id: 'p3', sourceWord: 'Thank you', targetWord: 'Спасибо'),
+      WordPair(id: 'p4', sourceWord: 'Please',    targetWord: 'Пожалуйста'),
+      WordPair(id: 'p5', sourceWord: 'Yes',       targetWord: 'Да'),
+      WordPair(id: 'p6', sourceWord: 'No',        targetWord: 'Нет'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'ru-puzzle-02', levelNumber: 2, title: 'Numbers',
+    courseLanguage: 'ru', cefrLevel: 'A1', xpReward: 20,
+    unlocksAfter: 'ru-puzzle-01',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'One',   targetWord: 'Один'),
+      WordPair(id: 'p2', sourceWord: 'Two',   targetWord: 'Два'),
+      WordPair(id: 'p3', sourceWord: 'Three', targetWord: 'Три'),
+      WordPair(id: 'p4', sourceWord: 'Four',  targetWord: 'Четыре'),
+      WordPair(id: 'p5', sourceWord: 'Five',  targetWord: 'Пять'),
+      WordPair(id: 'p6', sourceWord: 'Six',   targetWord: 'Шесть'),
+    ],
+  ),
+  PuzzleLevel(
+    id: 'ru-puzzle-03', levelNumber: 3, title: 'Colors',
+    courseLanguage: 'ru', cefrLevel: 'A1', xpReward: 25,
+    unlocksAfter: 'ru-puzzle-02',
+    pairs: [
+      WordPair(id: 'p1', sourceWord: 'Red',    targetWord: 'Красный'),
+      WordPair(id: 'p2', sourceWord: 'Blue',   targetWord: 'Синий'),
+      WordPair(id: 'p3', sourceWord: 'Green',  targetWord: 'Зелёный'),
+      WordPair(id: 'p4', sourceWord: 'Yellow', targetWord: 'Жёлтый'),
+      WordPair(id: 'p5', sourceWord: 'Black',  targetWord: 'Чёрный'),
+      WordPair(id: 'p6', sourceWord: 'White',  targetWord: 'Белый'),
+    ],
+  ),
+];
+
 const kPuzzleLevelsByLanguage = <String, List<PuzzleLevel>>{
   'es': kPuzzleLevels,
   'fr': kFrenchPuzzleLevels,
   'de': kGermanPuzzleLevels,
+  'it': kItalianPuzzleLevels,
+  'pt': kPortuguesePuzzleLevels,
+  'ja': kJapanesePuzzleLevels,
+  'ko': kKoreanPuzzleLevels,
+  'zh': kMandarinPuzzleLevels,
+  'ru': kRussianPuzzleLevels,
 };

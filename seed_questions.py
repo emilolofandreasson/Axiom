@@ -5,22 +5,31 @@ Checks global_questions coverage per (language, cefr_level) combination.
 For any pair with fewer than MIN_QUESTIONS questions, generates a batch via
 Gemini and inserts them into Supabase.
 
-Required env vars (set via GitHub Secrets or secrets.env locally):
+Required env vars (set as GitHub Secrets → passed via workflow env: block):
   SUPABASE_URL            — https://<ref>.supabase.co
   SUPABASE_SERVICE_KEY    — service_role key (bypasses RLS)
   GEMINI_SEED_API_KEY     — dedicated Gemini key, separate from user key
+
+For local testing, export the variables in your shell before running.
 """
 
 import os
 import json
-import random
 import uuid
 import time
 import sys
-import requests
-from dotenv import load_dotenv
+import requests  # only stdlib + requests needed — no extra deps
 
-load_dotenv("secrets.env", override=True)
+# ---------------------------------------------------------------------------
+# Validate required env vars before doing anything else
+# ---------------------------------------------------------------------------
+
+REQUIRED_VARS = ["SUPABASE_URL", "SUPABASE_SERVICE_KEY", "GEMINI_SEED_API_KEY"]
+missing = [v for v in REQUIRED_VARS if not os.environ.get(v)]
+if missing:
+    print(f"ERROR: Missing required environment variables: {', '.join(missing)}")
+    print("Set them as GitHub Secrets (SUPABASE_URL, SUPABASE_SERVICE_KEY, GEMINI_SEED_API_KEY)")
+    sys.exit(1)
 
 # ---------------------------------------------------------------------------
 # Config

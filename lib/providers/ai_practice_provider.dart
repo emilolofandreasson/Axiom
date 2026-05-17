@@ -3,7 +3,6 @@ import 'package:flick_sdk/flick_sdk.dart';
 import '../models/language_level.dart';
 import '../models/question.dart';
 import '../providers/daily_goal_provider.dart';
-import '../providers/hearts_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/saga_provider.dart';
 import '../providers/lesson_provider.dart' show AnswerState, QuestionResult;
@@ -137,8 +136,6 @@ class AiPracticeNotifier extends Notifier<AiPracticeState> {
       ],
     );
 
-    // Deduct a heart on wrong answer, same as daily lessons.
-    if (!isCorrect) ref.read(heartsProvider.notifier).loseHeart();
   }
 
   void advance() {

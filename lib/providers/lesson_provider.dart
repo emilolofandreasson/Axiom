@@ -10,7 +10,6 @@ import 'language_provider.dart';
 import 'review_provider.dart';
 import 'saga_provider.dart';
 import 'daily_goal_provider.dart';
-import 'hearts_provider.dart';
 import '../main.dart' show lessonGenerator, questionLibrary, questionContributor;
 
 // ---------------------------------------------------------------------------
@@ -274,14 +273,6 @@ class LessonNotifier extends Notifier<LessonState> {
       results: [...state.results, result],
     );
 
-    if (!isCorrect) {
-      ref.read(heartsProvider.notifier).loseHeart();
-      // If hearts are now empty, end the lesson.
-      if (ref.read(heartsProvider).isEmpty) {
-        state = state.copyWith(status: LessonStatus.outOfHearts);
-      }
-    }
-
     // Record answer in global library (fire-and-forget, only for library questions).
     if (q.globalId != null) {
       questionLibrary.recordAnswer(
@@ -412,11 +403,6 @@ class LessonNotifier extends Notifier<LessonState> {
       userXp:       sagaAfter.xpForLanguage(langCode),
       skillTag:     state.lesson.skillTag,
     );
-
-    // Refill hearts on lesson complete (reward for finishing).
-    if (state.accuracy >= 0.8) {
-      ref.read(heartsProvider.notifier).refillAll();
-    }
 
     EventSensor.instance.emit('lesson_completed', {
       'lesson_id':        state.lesson.id,

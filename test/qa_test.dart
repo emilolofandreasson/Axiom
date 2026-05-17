@@ -17,7 +17,6 @@ import 'package:axiom/core/theme/app_theme.dart';
 import 'package:axiom/models/language.dart';
 import 'package:axiom/models/question.dart';
 import 'package:axiom/providers/daily_goal_provider.dart';
-import 'package:axiom/providers/hearts_provider.dart';
 import 'package:axiom/providers/language_provider.dart';
 import 'package:axiom/providers/lesson_provider.dart';
 import 'package:axiom/providers/review_provider.dart';
@@ -46,19 +45,6 @@ class _MockSagaNotifier extends SagaNotifier {
 class _MockSagaEmpty extends SagaNotifier {
   @override
   SagaState build() => const SagaState(isLoading: false);
-}
-
-class _MockHeartsNotifier extends HeartsNotifier {
-  @override
-  HeartsState build() => const HeartsState(hearts: kMaxHearts);
-}
-
-class _MockHeartsEmpty extends HeartsNotifier {
-  @override
-  HeartsState build() => HeartsState(
-        hearts:   0,
-        refillAt: DateTime.now().add(const Duration(hours: 1)),
-      );
 }
 
 class _MockLanguageNotifier extends LanguageNotifier {
@@ -113,7 +99,6 @@ class _MockLessonNotifier extends LessonNotifier {
 
 List<Override> get _mockOverrides => [
       sagaProvider.overrideWith(_MockSagaNotifier.new),
-      heartsProvider.overrideWith(_MockHeartsNotifier.new),
       languageProvider.overrideWith(_MockLanguageNotifier.new),
       dailyGoalProvider.overrideWith(_MockDailyGoalNotifier.new),
       reviewProvider.overrideWith(_MockReviewEmpty.new),
@@ -304,28 +289,7 @@ void main() {
     });
   });
 
-  // ── 4. Hearts ─────────────────────────────────────────────────────────────
-
-  group('Hearts', () {
-    testWidgets('Fulla hjärtan: app startar korrekt', (tester) async {
-      await tester.pumpWidget(testApp(const MainScreen()));
-      await settle(tester);
-
-      expect(find.byType(NavigationBar), findsOneWidget);
-    });
-
-    testWidgets('Tomma hjärtan: app kraschar ej', (tester) async {
-      await tester.pumpWidget(testApp(
-        const MainScreen(),
-        extra: [heartsProvider.overrideWith(_MockHeartsEmpty.new)],
-      ));
-      await settle(tester);
-
-      expect(find.byType(NavigationBar), findsOneWidget);
-    });
-  });
-
-  // ── 5. Review badge ───────────────────────────────────────────────────────
+  // ── 4. Review badge ───────────────────────────────────────────────────────
 
   group('Review badge', () {
     testWidgets('Ingen badge när review-kö är tom', (tester) async {

@@ -5,7 +5,6 @@ import '../core/theme/app_theme.dart';
 import '../models/lesson.dart';
 import '../models/question.dart';
 import '../providers/lesson_provider.dart';
-import '../providers/hearts_provider.dart';
 import '../widgets/exercises/multiple_choice_card.dart';
 import '../widgets/exercises/word_order_puzzle.dart';
 import '../widgets/chat/ai_chat_panel.dart';
@@ -44,22 +43,8 @@ class DailyLessonScreen extends ConsumerWidget {
       );
     }
 
-    // Out of hearts — show blocking screen with refill timer.
-    if (state.status == LessonStatus.outOfHearts) {
-      return _NoHeartsScreen(
-        onClose: () {
-          notifier.build(); // reset lesson state
-          if (context.mounted) Navigator.of(context).pop();
-        },
-      );
-    }
-
-    // Idle — block if hearts are empty before letting the user start.
+    // Idle — show lesson intro.
     if (state.status == LessonStatus.idle) {
-      final hearts = ref.watch(heartsProvider);
-      if (hearts.isEmpty) {
-        return _NoHeartsScreen(onClose: () => Navigator.of(context).pop());
-      }
       return _LessonIntroScreen(
         lesson: state.lesson,
         onStart: notifier.startLesson,
@@ -169,8 +154,6 @@ class _LessonAppBar extends ConsumerWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hearts = ref.watch(heartsProvider).hearts;
-
     return Column(
       children: [
         AppBar(
@@ -180,23 +163,6 @@ class _LessonAppBar extends ConsumerWidget implements PreferredSizeWidget {
             tooltip: 'Exit lesson',
           ),
           title: Text(lessonTitle),
-          actions: [
-            // Hearts row
-            Padding(
-              padding: const EdgeInsets.only(right: FlickSpacing.md),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: List.generate(kMaxHearts, (i) => Padding(
-                  padding: const EdgeInsets.only(left: 2),
-                  child: Icon(
-                    i < hearts ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                    size: 18,
-                    color: i < hearts ? Colors.red : FlickColors.textMuted,
-                  ),
-                )),
-              ),
-            ),
-          ],
         ),
 
         // Progress bar
@@ -390,106 +356,6 @@ class _ContinueButton extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// No hearts screen — blocks lesson until refill
-// ---------------------------------------------------------------------------
-
-class _NoHeartsScreen extends ConsumerStatefulWidget {
-  const _NoHeartsScreen({required this.onClose});
-  final VoidCallback onClose;
-
-  @override
-  ConsumerState<_NoHeartsScreen> createState() => _NoHeartsScreenState();
-}
-
-class _NoHeartsScreenState extends ConsumerState<_NoHeartsScreen> {
-  late final _timer = Stream.periodic(const Duration(seconds: 1));
-
-  @override
-  Widget build(BuildContext context) {
-    final hearts = ref.watch(heartsProvider);
-    return StreamBuilder(
-      stream: _timer,
-      builder: (context, _) {
-        final refilled = hearts.hearts > 0;
-        final d = hearts.timeUntilRefill;
-        final countdown = d == Duration.zero
-            ? null
-            : '${d.inMinutes.remainder(60).toString().padLeft(2, '0')}:'
-              '${d.inSeconds.remainder(60).toString().padLeft(2, '0')}';
-
-        return Scaffold(
-          backgroundColor: FlickColors.background,
-          body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(FlickSpacing.xl),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('❤️‍🔥', style: TextStyle(fontSize: 64)),
-                  const SizedBox(height: FlickSpacing.xl),
-                  Text(
-                    refilled ? 'Hearts refilled!' : 'Out of hearts',
-                    style: Theme.of(context).textTheme.displaySmall,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: FlickSpacing.md),
-                  Text(
-                    refilled
-                        ? 'You\'re ready to keep going!'
-                        : 'Your hearts will refill over time.\nCome back after a break.',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyLarge!
-                        .copyWith(color: FlickColors.textSecondary),
-                    textAlign: TextAlign.center,
-                  ),
-                  if (countdown != null) ...[
-                    const SizedBox(height: FlickSpacing.xl),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: FlickSpacing.lg, vertical: FlickSpacing.md),
-                      decoration: BoxDecoration(
-                        color: FlickColors.surface,
-                        borderRadius: const BorderRadius.all(FlickRadius.lg),
-                        border: Border.all(color: FlickColors.border),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.timer_outlined,
-                              color: FlickColors.textSecondary, size: 18),
-                          const SizedBox(width: FlickSpacing.sm),
-                          Text('Next heart in $countdown',
-                              style: Theme.of(context).textTheme.labelLarge),
-                        ],
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: FlickSpacing.xxl),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: refilled ? widget.onClose : null,
-                      child: Text(refilled ? 'Continue lesson' : 'Check back later'),
-                    ),
-                  ),
-                  const SizedBox(height: FlickSpacing.md),
-                  TextButton(
-                    onPressed: widget.onClose,
-                    child: const Text('Back to home',
-                        style: TextStyle(color: FlickColors.textSecondary)),
-                  ),
-                ],
-              ).animate().fadeIn(duration: 400.ms),
-            ),
-          ),
-        );
-      },
     );
   }
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'question.dart';
 
-enum LessonStatus { idle, inProgress, completed, abandoned, outOfHearts }
+enum LessonStatus { idle, inProgress, completed, abandoned }
 
 @immutable
 class Lesson {

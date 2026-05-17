@@ -40,7 +40,7 @@ SUPABASE_KEY      = os.environ["SUPABASE_SERVICE_KEY"]
 GEMINI_API_KEY    = os.environ["GEMINI_SEED_API_KEY"]
 GEMINI_MODEL      = "gemini-1.5-flash"   # stable, high free-tier quota
 GEMINI_ENDPOINT   = (
-    f"https://generativelanguage.googleapis.com/v1beta/models/"
+    f"https://generativelanguage.googleapis.com/v1/models/"
     f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 )
 

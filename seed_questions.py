@@ -69,7 +69,7 @@ ALL_TARGETS = [
     ("da", "A1"), ("pl", "A1"), ("tr", "A1"),
 ]
 
-# Rotate through languages to spread daily quota over 14 days (~2 langs/night)
+# Rotate through languages to spread daily quota over ~7 days (~4 langs per run, 2×/day)
 # Override with SEED_LANGUAGES env var (comma-separated: "es,fr,de")
 SEED_LANGUAGES = os.environ.get("SEED_LANGUAGES", "").split(",") if os.environ.get("SEED_LANGUAGES") else None
 
@@ -78,11 +78,11 @@ if SEED_LANGUAGES and SEED_LANGUAGES[0]:
     TARGETS = [pair for pair in ALL_TARGETS if pair[0] in SEED_LANGUAGES]
     print(f"Seeding specific languages: {SEED_LANGUAGES}\n")
 else:
-    # Pick 2 random languages per run to spread quota
+    # Pick 4 random languages per run to fill all in ~7 days (2 runs/day)
     all_langs = list(set(lang for lang, _ in ALL_TARGETS))
-    langs_this_run = sorted(random.sample(all_langs, min(2, len(all_langs))))
+    langs_this_run = sorted(random.sample(all_langs, min(4, len(all_langs))))
     TARGETS = [pair for pair in ALL_TARGETS if pair[0] in langs_this_run]
-    print(f"Rotating seed (2 languages per night). Tonight: {langs_this_run}\n")
+    print(f"Rotating seed (4 languages per run, 2×/day). This run: {langs_this_run}\n")
 
 LANGUAGE_NAMES = {
     "es": "Spanish",        "fr": "French",          "de": "German",

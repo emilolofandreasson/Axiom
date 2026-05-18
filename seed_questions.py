@@ -18,6 +18,7 @@ import json
 import uuid
 import time
 import sys
+import random
 import threading
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -49,12 +50,12 @@ GEMINI_ENDPOINT   = (
 MIN_QUESTIONS        = 50    # target floor per (language, cefr_level)
 BATCH_SIZE           = 10    # questions generated per Gemini call
 MAX_BATCHES_PER_PAIR = 10    # max Gemini calls per (lang, cefr) pair
-MAX_WORKERS          = 4     # parallel threads — 4 × ~7 RPM ≈ 28 RPM (under 30 limit)
-INTER_CALL_DELAY     = 2.1   # seconds enforced by rate limiter between any two calls
-RETRY_DELAY_S        = 10    # base wait on 429 (exponential: 10, 20, 30)
+MAX_WORKERS          = 2     # parallel threads — 2 × ~5 RPM ≈ 10 RPM (safe margin)
+INTER_CALL_DELAY     = 6.0   # seconds enforced by rate limiter between any two calls
+RETRY_DELAY_S        = 15    # base wait on 429 (exponential: 15, 30, 45)
 
 # Languages and CEFR levels to maintain
-TARGETS = [
+ALL_TARGETS = [
     ("es", "A1"), ("es", "A2"), ("es", "B1"), ("es", "B2"),
     ("fr", "A1"), ("fr", "A2"), ("fr", "B1"),
     ("de", "A1"), ("de", "A2"), ("de", "B1"),
@@ -67,6 +68,21 @@ TARGETS = [
     ("nl", "A1"), ("sv", "A1"), ("no", "A1"),
     ("da", "A1"), ("pl", "A1"), ("tr", "A1"),
 ]
+
+# Rotate through languages to spread daily quota over 14 days (~2 langs/night)
+# Override with SEED_LANGUAGES env var (comma-separated: "es,fr,de")
+SEED_LANGUAGES = os.environ.get("SEED_LANGUAGES", "").split(",") if os.environ.get("SEED_LANGUAGES") else None
+
+if SEED_LANGUAGES and SEED_LANGUAGES[0]:
+    # Explicit language list provided
+    TARGETS = [pair for pair in ALL_TARGETS if pair[0] in SEED_LANGUAGES]
+    print(f"Seeding specific languages: {SEED_LANGUAGES}\n")
+else:
+    # Pick 2 random languages per run to spread quota
+    all_langs = list(set(lang for lang, _ in ALL_TARGETS))
+    langs_this_run = sorted(random.sample(all_langs, min(2, len(all_langs))))
+    TARGETS = [pair for pair in ALL_TARGETS if pair[0] in langs_this_run]
+    print(f"Rotating seed (2 languages per night). Tonight: {langs_this_run}\n")
 
 LANGUAGE_NAMES = {
     "es": "Spanish",        "fr": "French",          "de": "German",
@@ -338,7 +354,7 @@ def process_pair(lang: str, cefr: str, current: int) -> dict:
 
 def main():
     print("=== Axiom Question Bank Seeder ===")
-    print(f"Target: {MIN_QUESTIONS} per (language, cefr_level) | workers: {MAX_WORKERS} | RPM limit: ~{int(60 / INTER_CALL_DELAY * MAX_WORKERS)}\n")
+    print(f"Config: {MIN_QUESTIONS} q/pair | {MAX_WORKERS} workers | ~{int(60 / INTER_CALL_DELAY * MAX_WORKERS)} RPM (safe)\n")
 
     counts = get_counts()
 
@@ -348,8 +364,8 @@ def main():
         if counts.get((lang, cefr), 0) < MIN_QUESTIONS
     ]
 
-    skipped = len(TARGETS) - len(pairs_to_fill)
-    print(f"Pairs at target: {skipped}/{len(TARGETS)} — filling {len(pairs_to_fill)} pairs\n")
+    at_target = len(TARGETS) - len(pairs_to_fill)
+    print(f"Tonight's target pairs: {len(TARGETS)} | At minimum: {at_target} | Need filling: {len(pairs_to_fill)}\n")
 
     if not pairs_to_fill:
         print("All pairs above threshold — nothing to do.")

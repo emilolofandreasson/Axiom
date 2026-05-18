@@ -10,6 +10,7 @@ import 'language_provider.dart';
 import 'review_provider.dart';
 import 'saga_provider.dart';
 import 'daily_goal_provider.dart';
+import 'achievement_provider.dart';
 import '../main.dart' show lessonGenerator, questionLibrary, questionContributor;
 
 // ---------------------------------------------------------------------------
@@ -355,7 +356,7 @@ class LessonNotifier extends Notifier<LessonState> {
 
   void advance() {
     if (state.isLastQuestion) {
-      _completeLesson();
+      unawaited(_completeLesson());
       return;
     }
 
@@ -366,7 +367,7 @@ class LessonNotifier extends Notifier<LessonState> {
     );
   }
 
-  void _completeLesson() {
+  Future<void> _completeLesson() async {
     final xp           = state.lesson.xpReward;
     final langCode     = state.lesson.courseLanguage;
     final sagaBefore   = ref.read(sagaProvider);
@@ -417,6 +418,23 @@ class LessonNotifier extends Notifier<LessonState> {
           : 0,
       'xp_earned':        xp,
     });
+
+    // Check achievements
+    final achievementService = ref.read(achievementServiceProvider);
+
+    // first_lesson
+    await achievementService.unlock('first_lesson');
+
+    // perfectionist: 100% accuracy
+    if (state.accuracy >= 1.0) {
+      await achievementService.unlock('perfectionist');
+    }
+
+    // night_owl: lesson after 22:00
+    final hour = DateTime.now().hour;
+    if (hour >= 22 || hour < 6) {
+      await achievementService.unlock('night_owl');
+    }
   }
 
   bool _listEquals(List<String> a, List<String> b) {

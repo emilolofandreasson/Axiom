@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/language_level.dart';
 import '../models/puzzle_level.dart';
+import 'achievement_provider.dart';
 
 // ---------------------------------------------------------------------------
 // State
@@ -336,6 +337,7 @@ class SagaNotifier extends Notifier<SagaState> {
 
     final updated = Map<String, int>.from(state.xpByLanguage);
     updated[languageCode] = (updated[languageCode] ?? 0) + xpReward;
+    final totalXpAfter = updated.values.fold(0, (s, v) => s + v);
 
     state = state.copyWith(
       xpByLanguage:   updated,
@@ -352,6 +354,19 @@ class SagaNotifier extends Notifier<SagaState> {
       });
     }
     await _save();
+
+    // Check achievements
+    final achievementService = ref.read(achievementServiceProvider);
+
+    // Streak achievements
+    if (newStreak == 3) await achievementService.unlock('streak_3');
+    if (newStreak == 7) await achievementService.unlock('streak_7');
+    if (newStreak == 30) await achievementService.unlock('streak_30');
+
+    // XP achievements (check total XP)
+    if (totalXpAfter >= 100) await achievementService.unlock('xp_100');
+    if (totalXpAfter >= 500) await achievementService.unlock('xp_500');
+    if (totalXpAfter >= 1000) await achievementService.unlock('xp_1000');
   }
 
   Future<void> recordRetry(String levelId) async {

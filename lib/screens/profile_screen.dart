@@ -16,6 +16,7 @@ import 'debug_screen.dart';
 import 'edit_profile_screen.dart';
 import 'friends_screen.dart';
 import 'privacy_settings_screen.dart';
+import 'achievements_screen.dart';
 
 const _kCountryNames = {
   'SE': '🇸🇪 Sweden',     'US': '🇺🇸 United States', 'GB': '🇬🇧 United Kingdom',
@@ -166,29 +167,52 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     _PersonaChips(profile: _profile!),
                   ],
                   const SizedBox(height: FlickSpacing.md),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => FriendsScreen(
-                              myProfile: _profile ??
-                                  UserProfile(
-                                    uid: authService.currentUser?.id ?? '',
-                                  )),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AchievementsScreen(),
+                            ),
+                          ),
+                          icon: const Icon(Icons.emoji_events, size: 18),
+                          label: const Text('Achievements'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: FlickColors.primary,
+                            side: const BorderSide(color: FlickColors.border),
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.all(FlickRadius.full),
+                            ),
+                          ),
                         ),
                       ),
-                      icon: const Icon(Icons.people_rounded, size: 18),
-                      label: const Text('Friends'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: FlickColors.primary,
-                        side: const BorderSide(color: FlickColors.border),
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.all(FlickRadius.full),
+                      const SizedBox(width: FlickSpacing.sm),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => FriendsScreen(
+                                  myProfile: _profile ??
+                                      UserProfile(
+                                        uid: authService.currentUser?.id ?? '',
+                                      )),
+                            ),
+                          ),
+                          icon: const Icon(Icons.people_rounded, size: 18),
+                          label: const Text('Friends'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: FlickColors.primary,
+                            side: const BorderSide(color: FlickColors.border),
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.all(FlickRadius.full),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),

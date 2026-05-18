@@ -7,7 +7,30 @@
       "Bash(git push *)",
       "Bash(flutter analyze *)",
       "mcp__supabase__list_projects",
-      "mcp__supabase__list_tables"
+      "mcp__supabase__list_tables",
+      "mcp__supabase__get_advisors",
+      "mcp__supabase__apply_migration",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\emil.andreasson\\\\Claude\\\\language_flick\" -Recurse -Name -Include \"*flick*sdk*\" -Directory)",
+      "Bash(Get-Content *)",
+      "Bash(gh run *)",
+      "PowerShell(gh run *)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "PowerShell(flutter analyze *)",
+      "Bash(where gh *)",
+      "Bash(dart analyze *)",
+      "mcp__supabase__execute_sql",
+      "WebFetch(domain:generativelanguage.googleapis.com)",
+      "Bash(findstr /R \"kLessonsByLanguage\" lib\\\\*.dart lib\\\\screens\\\\*.dart lib\\\\providers\\\\*.dart)",
+      "Bash(xargs grep \"kPuzzleLevelsByLanguage\")",
+      "Bash(findstr -i supabase)",
+      "Bash(cat)",
+      "Bash(python /tmp/check_questions.py)",
+      "Bash(curl -s -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95bWxkZGpjdXNpeWF4dGZjdmFkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODQyODM4NywiZXhwIjoyMDk0MDA0Mzg3fQ.gl1wvdwAhHgdjY58FTwqEGqzXa48IrcJie4kXrLt000' -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95bWxkZGpjdXNpeWF4dGZjdmFkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODQyODM4NywiZXhwIjoyMDk0MDA0Mzg3fQ.gl1wvdwAhHgdjY58FTwqEGqzXa48IrcJie4kXrLt000' -H 'Content-Type: application/json' 'https://oymlddjcusiyaxtfcvad.supabase.co/rest/v1/global_questions?select=language,cefr_level&is_defective=eq.false')",
+      "Bash(curl -s -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95bWxkZGpjdXNpeWF4dGZjdmFkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODQyODM4NywiZXhwIjoyMDk0MDA0Mzg3fQ.gl1wvdwAhHgdjY58FTwqEGqzXa48IrcJie4kXrLt000' -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95bWxkZGpjdXNpeWF4dGZjdmFkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODQyODM4NywiZXhwIjoyMDk0MDA0Mzg3fQ.gl1wvdwAhHgdjY58FTwqEGqzXa48IrcJie4kXrLt000' 'https://oymlddjcusiyaxtfcvad.supabase.co/rest/v1/global_questions?select=language,cefr_level&is_defective=eq.false')",
+      "Bash(awk '{print \"  \" $1 \" frågor totalt\"}')",
+      "Bash(dir *)",
+      "Read(//tmp/**)"
     ]
   }
 }

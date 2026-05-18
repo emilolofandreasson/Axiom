@@ -35,9 +35,9 @@ class LanguagePickerScreen extends ConsumerWidget {
             language:   lang,
             isSelected: isSelected,
             onTap: lang.hasContent
-                ? () {
-                    ref.read(languageProvider.notifier).selectLanguage(lang);
-                    Navigator.pop(context);
+                ? () async {
+                    await ref.read(languageProvider.notifier).selectLanguage(lang);
+                    if (context.mounted) Navigator.pop(context);
                   }
                 : null,
           )

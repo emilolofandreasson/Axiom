@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flick_sdk/flick_sdk.dart';
 import '../core/theme/app_theme.dart';
 import '../providers/review_provider.dart';
+import '../providers/achievement_provider.dart';
+import '../models/achievement.dart';
+import '../widgets/achievement_toast.dart';
 import 'home_screen.dart';
 import 'daily_lesson_screen.dart';
 import 'review_screen.dart';
@@ -37,6 +40,22 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final reviewCount = ref.watch(reviewProvider).length;
+
+    // Listen for achievement unlocks
+    ref.listen(unlockedAchievementsProvider, (previous, next) {
+      next.whenData((newIds) {
+        if (previous == null) return; // Skip first build
+        previous.whenData((oldIds) {
+          final newly = newIds.difference(oldIds);
+          for (final id in newly) {
+            final achievement = Achievement.get(id);
+            if (achievement != null) {
+              _showAchievementToast(context, achievement);
+            }
+          }
+        });
+      });
+    });
 
     return Scaffold(
       backgroundColor: FlickColors.background,
@@ -93,5 +112,20 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         ],
       ),
     );
+  }
+
+  void _showAchievementToast(BuildContext context, Achievement achievement) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.transparent,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: AchievementToast(achievement: achievement),
+      ),
+    );
+    Future.delayed(const Duration(seconds: 4), () {
+      if (context.mounted) Navigator.of(context).pop();
+    });
   }
 }

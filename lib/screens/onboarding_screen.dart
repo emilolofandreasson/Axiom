@@ -356,7 +356,7 @@ class _ChooseLanguagePage extends ConsumerWidget {
                   language: lang,
                   isSelected: isSelected,
                   onTap: lang.hasContent
-                      ? () => ref.read(languageProvider.notifier).selectLanguage(lang)
+                      ? () async => await ref.read(languageProvider.notifier).selectLanguage(lang)
                       : null,
                 )
                     .animate(delay: (i * 40).ms)

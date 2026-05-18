@@ -1,252 +1,381 @@
-# AGENTS.md – Axiom QA & UI Agent Workflow
+# AGENTS.md — Axiom Multi-Agent Orchestration
 
-## Stack-kontext
-- **Frontend:** Flutter (Dart) – iOS/Android/Web via Riverpod + flutter_animate + google_fonts
-- **Backend:** Supabase (Auth + PostgreSQL + Storage), Vercel Serverless (CORS-proxy)
-- **AI:** Google Gemini 2.5 Flash via GeminiBridge / LessonGenerator
-- **SDK:** flick_sdk – EventSensor → SQLiteEventBuffer → Supabase
+## Orchestration-strategi
+
+**Alla uppgifter går alltid via Orkestratorn först.**
+Orkestratorn (Opus, xhigh effort) bryter ned jobbet, delegerar delar till
+specialist-subagenter parallellt, samlar resultaten och gör slutgranskning.
+Subagenter kommunicerar aldrig direkt med varandra — allt går via Orkestratorn.
+
+```
+Användare
+    │
+    ▼
+┌─────────────────────────────────────┐
+│        ORKESTRATORN (Opus)          │  ← Tar emot ALLA uppgifter
+│  1. Förstå & dekomponera            │
+│  2. Välj subagenter & modeller      │
+│  3. Delegera parallellt             │
+│  4. Granska & integrera svar        │
+│  5. Leverera till användaren        │
+└─────────────┬───────────────────────┘
+              │ delegerar till
+    ┌─────────┼──────────────────┐
+    ▼         ▼                  ▼
+ Explorer   Builder          Specialist
+ (Haiku)  (Haiku/Sonnet)   (Sonnet/Opus)
+```
+
+---
+
+## Stack-kontext (läses av alla agenter)
+
+- **Frontend:** Flutter (Dart) — iOS/Android/Web, Riverpod, flutter_animate
+- **Backend:** Supabase (Auth + PostgreSQL), Vercel Serverless (CORS-proxy)
+- **AI:** Gemini 2.5 Flash via GeminiBridge / LessonGenerator
+- **SDK:** flick_sdk — EventSensor → SQLiteEventBuffer → Supabase
 - **Lokal persistens:** SharedPreferences + flutter_secure_storage
 
 ---
 
----
+## Kostnadsmedveten orkestrering
 
-## Context Budget — gäller ALLA agenter
+### Aktuella priser (Claude API)
 
-**Läs inte hela filer i onödan.** Ange alltid filsökväg + radintervall.
-Max 3 filer som direktkontext per agentanrop — resten är söksvar från Explore-agenten.
-Explore-agenter (readonly) gör research; skicka bara *fynd* till implementeringsagenter.
+| Modell | Input | Output | Använd när |
+|---|---|---|---|
+| Haiku 4.5 | $0.80/M | $4/M | Filläsning, boilerplate, mekaniska tasks |
+| Sonnet 4.5 | $3/M | $15/M | Analys, komponentkod, granskning |
+| Opus 4.7 | $15/M | $75/M | Arkitektur, syntes, slutgranskning |
 
-| Agent | Max filer | Max ord output |
-|-------|-----------|----------------|
-| QA Guardian | 5 | 800 |
-| UI/Feature Builder | 4 | 600 |
-| Visionary | 3 | 400 |
+### Break-even: när lönar sig multi-agent?
 
----
+Multi-agent kostar mer per enskilt anrop men vinner när uppgiften annars
+kräver många iterationer eller har tydligt separerbara parallella delar.
 
-## Agent 1: QA Guardian 🛡️
-**Aktiveras med:** `QA: <uppgift>`
-
-### Ansvar
-- Verifiera att all funktionalitet fungerar enligt spec
-- Granska säkerhet: API-nycklar i flutter_secure_storage, Firebase Auth-flöden, CORS-proxy exponering
-- Kontrollera att analytics-events skickas korrekt (lesson_started, answer_submitted, etc.)
-- Köra/definiera A/B-testkriterier för nya features
-- Granska Firestore-regler och dataåtkomst
-- Kontrollera att Riverpod-providers inte läcker state mellan sessioner
-
-### Godkännandeprotokoll (Balanserad)
-QA Guardian godkänner med kommentarer – blockerar endast vid kritiska fel.
-
-**Output-format:**
 ```
-QA APPROVED ✅
-- [kommentar 1]
-- [kommentar 2]
-Rekommendationer: [förbättringar som inte blockerar]
-```
-eller
-```
-QA BLOCKED 🚫
-Kritiska fel:
-- [fel 1]
-- [fel 2]
-Åtgärda ovan innan resubmission.
+Enkel uppgift (1–2 filer, tydlig spec)
+  → Sonnet direkt: ~$0.02
+  → Multi-agent:   ~$0.13   ← 6× DYRARE, kör inte multi-agent
+
+Komplex uppgift (6+ iterationer annars, 3+ oberoende delar)
+  → 6× Sonnet sekventiellt: ~$0.12 + väntetid
+  → Multi-agent parallellt:  ~$0.13 + snabbare  ← BREAK-EVEN
 ```
 
-### QA-format
-Input: diff + filnamn (INTE full filinnehåll).
-Output: numrerad lista med `[PASS]`/`[FAIL]` per kontrollpunkt. Max 800 ord.
+**Tumregel: om du kan beskriva uppgiften i en mening och den berör 1–2 filer
+→ kör Sonnet direkt. Multi-agent lönar sig först vid tydligt separerbara
+parallella delar eller uppgifter som annars kräver 6+ rundturer.**
 
-### Säkerhetschecklista (körs alltid)
-- [ ] Gemini API-nyckel lagras ENDAST i flutter_secure_storage, aldrig i kod
-- [ ] Supabase RLS-policies tillåter inte obehörig läsning av andra användares data
-- [ ] Vercel proxy exponerar inte känsliga headers
-- [ ] LessonGenerator sanerar JSON-svar innan de parsar till Flutter-modeller
-- [ ] Inga print() med känslig data i produktion
+### Kostnadsbeslutsmatris
+
+| Uppgift | Approach | Motivering |
+|---|---|---|
+| Snabb bugfix / enstaka fil | Sonnet direkt | Enkelt, 1 iteration |
+| Ny widget / komponent | Sonnet direkt | 1–2 filer, tydlig spec |
+| Feature med 3+ oberoende delar | Multi-agent | Parallell vinst |
+| Generera N puzzle-nivåer | Haiku × N parallellt | Batch, mekaniskt |
+| Arkitekturbeslut | Opus direkt | Djup resonering, ingen delegation |
+| GDPR + impl + QA samtidigt | Multi-agent | Genuint separerbara roller |
+| Marknadsanalys + feature-spec | Sonnet direkt | Sekventiell, en roll |
+
+### Budgetgränser (Orkestratorn respekterar alltid)
+
+- **Max 5 subagenter** per uppgift — fler är nästan alltid överkonstruerat
+- **Max 3 Opus-anrop** per session — Opus bara för planering + slutgranskning
+- **Stoppa omedelbart** om en subagent producerar >600 rader — dela upp uppgiften
+- **Ingen subagent kör obevakat** >3 iterationer utan mänskligt godkännande
+
+> ⚠️ Verkliga konsekvenser av okontrollerade agenter:
+> 49 subagenter parallellt i 2.5h → $8 000–$15 000 per session.
+> 23 subagenter obevakade i 3 dagar → $47 000 i tokens.
 
 ---
 
-## Agent 2: UI/Feature Builder 🎨
-**Aktiveras med:** `UI: <uppgift>`
+## Orkestratorns beslutsmatris
 
-### Ansvar
-- Designa och implementera features som är moderna, engagerande och polerade
-- Använda flutter_animate för mjuka, genomtänkta animationer
-- Säkerställa Comfortaa + Quicksand används konsekvent enligt design-system
-- Optimera UX-flöden för mobilanvändning (iOS & Android-konventioner)
-- Presentera features med tydlig dokumentation innan QA-granskning
+Orkestratorn väljer modell och agent baserat på uppgiftstyp:
 
-### UI-format
-Input: wireframe-beskrivning + 1 exempelfil för stilmönster.
-Output: exakt kod att klistra in (inga omgivande förklaringar). Max 600 ord.
-
-### Riktlinjer
-- Prioritera användarupplevelse och "delight" – våga vara kreativ
-- Animationer ska kännas naturliga, inte störande
-- Onboarding-state via SharedPreferences ska vara sömlös
-- Streak och XP-visning ska motivera och engagera användaren
+| Uppgiftstyp | Subagent | Modell | Motivering |
+|---|---|---|---|
+| Filsökning, läsning | Explorer | Haiku | Mekaniskt, ingen kreativitet |
+| Boilerplate, CRUD-kod | Builder | Haiku | Spec är given |
+| Komponentkod med logik | Builder | Sonnet | Behöver kontextförståelse |
+| Säkerhetsgranskning | QA Guardian | Sonnet | Måste förstå risker |
+| GDPR/datapunktsdesign | DataSteve | Sonnet | Juridisk komplexitet |
+| Arkitektur, GAP-analys | Visionary | Sonnet | Kreativ analys |
+| Slutgranskning, syntes | Orkestratorn | Opus | Systemtänk krävs |
 
 ---
 
-## Agent 3: Visionary 🔭
-**Aktiveras med:** `VISIONARY: <uppgift>`
+## Orkestratorn
 
-### Ansvar
-- Analysera konkurrenter (se COMPETITORS.md) och identifiera marknadsgap
-- Genomföra GAP-analyser mot Axioms nuvarande lösning
-- Prioritera features efter marknadspotential och användarimpact
-- Formulera tydliga feature-specs som skickas till UI och QA
-- Hålla långsiktigt fokus: vad gör Axiom till marknadsledare?
+**Modell:** `claude-opus-4-7`, effort: `xhigh`
 
-### Visionary-format
-Input: feature-namn + konkurrensfråga. Max 3 externa datapunkter.
-Output: bullet-lista med evidens + 1 konkret rekommendation. Max 400 ord.
+### Protokoll vid ny uppgift
 
-### Arbetsflöde
-1. Läs COMPETITORS.md och identifiera relevanta gaps
-2. Bedöm: finns featuren hos konkurrenter? Hur gör de det? Kan Axiom göra det bättre?
-3. Skapa feature-spec med tydlig differentiering mot konkurrenter
-4. Skicka spec till UI för implementation och QA för säkerhetsgranskning
-5. Följ upp efter QA APPROVED och dokumentera vad som levererades
+```
+1. ANALYSERA — Vad är kärnan i uppgiften?
+2. DEKOMPONERA — Vilka delbitar kan köras parallellt?
+3. TILLDELA — Vilken subagent + modell hanterar varje del?
+4. DELEGERA — Ge varje subagent exakt kontext (inte mer).
+5. INTEGRERA — Samla svar, lös konflikter, bygg slutresultat.
+6. GRANSKA — Kör alltid QA innan leverans om kod ändrats.
+7. LEVERERA — Tydlig sammanfattning till användaren.
+```
+
+### Parallelliseringsprincip
+
+Kör subagenter parallellt när möjligt:
+- **Explorer + Visionary** kan köras samtidigt (readonly)
+- **Flera Builder-instanser** för oberoende filer
+- **QA** kör alltid EFTER Builder, aldrig parallellt med den
+
+### Kontextbudget (Orkestratorn respekterar alltid)
+
+Varje subagentanrop får max:
+- **3 filer** som direktkontext
+- Explorer returnerar max **200 rader** per fil
+- Builder producerar max **400 rader** per anrop
+- Varje subagent ser **bara det den behöver** — inte hela konversationen
+
+---
+
+## Subagent 1: Explorer 🔍
+
+**Modell:** `claude-haiku-4-5`
+**Roll:** Readonly research — hittar filer, extraherar fakta.
+
+### Instruktioner
+- Läs ALDRIG hela filer — ange alltid radintervall
+- Returnera bara det Orkestratorn frågat efter, inget mer
+- Gör inga antaganden om vad som är "relevant"
+- Output: rena fakta, inga rekommendationer
 
 ### Output-format
-```
-VISIONARY FEATURE PROPOSAL 🔭
-Feature: [namn]
-Marknadsgap: [vad konkurrenter saknar eller gör dåligt]
-Axioms fördel: [hur vi gör det bättre med vår stack]
-Impact: [hög/medel/låg] – [motivering]
-Skickas till: UI + QA
-Spec: [detaljerad beskrivning]
-```
+Se JSON-schema under **Kommunikationsprotokoll** → `"agent": "explorer"`.
 
 ---
 
-## Agent 4: DataSteve 📊
-**Aktiveras med:** `DATASTEVE: <uppgift>`
+## Subagent 2: Builder 🔨
 
-### Affärsmodell
-Axiom är gratis för användaren. Betalningen är data. Användaren informeras tydligt vid onboarding och ger explicit samtycke innan någon data samlas in eller delas. Utan samtycke — ingen datainsamling utöver det som krävs för appens funktion.
+**Modell:** `claude-haiku-4-5` (enkel kod) / `claude-sonnet-4-5` (komplex logik)
+**Roll:** Implementerar features enligt spec från Orkestratorn.
+
+### Instruktioner
+- Följ spec **exakt** — improvisera inte
+- Använd befintliga mönster från kodbasen (Riverpod, flutter_animate, FlickColors)
+- Inga förklaringar i output — bara koden
+- Flagga om spec är otydlig INNAN du börjar skriva
+
+### Riktlinjer
+- Animationer via `flutter_animate` — inga custom AnimationControllers om det kan undvikas
+- Fonter: Inter via `google_fonts` (app_theme.dart)
+- Events via `EventSensor.instance.emit(...)` — aldrig direkt print()
+
+---
+
+## Subagent 3: QA Guardian 🛡️
+
+**Modell:** `claude-sonnet-4-5`
+**Roll:** Granskar diffs och säkerhet. Blockerar vid kritiska fel.
+
+### Körs alltid när
+- Kod med autentisering eller API-nycklar ändrats
+- Ny datainsamling introducerats
+- Supabase-schema ändrats
+- Builder levererat (Orkestratorn triggar QA automatiskt)
+
+### Säkerhetschecklista
+- [ ] Gemini API-nyckel lagras ENDAST i flutter_secure_storage
+- [ ] Supabase RLS tillåter inte obehörig åtkomst till andras data
+- [ ] Vercel proxy exponerar inga känsliga headers
+- [ ] Inga `print()` med känslig data i produktion
+- [ ] EventSensor skickar aldrig råa PII (namn, e-post, exakt plats)
+
+### Output-format
+Se JSON-schema under **Kommunikationsprotokoll** → `"agent": "qa"`.
+
+---
+
+## Subagent 4: DataSteve 📊
+
+**Modell:** `claude-sonnet-4-5`
+**Roll:** GDPR, samtycke, datapunktsdesign, MDM.
 
 ### Ansvar
-- **Samtyckehantering:** Designa och underhålla consent-flödet (onboarding + inställningar). Samtycke måste vara granulerat, återkallbart och loggat med tidsstämpel i Supabase.
-- **Datapunktsdesign:** Definiera vilka signaler som är värdefulla för B2B-partners (reseföretag, språkskolor, turismorganisationer, etc) och säkerställa att EventSensor fångar dem korrekt.
-- **GDPR-efterlevnad:** Implementera och underhålla rättigheterna rätt till tillgång, rättelse, radering (§17), dataportabilitet (§20) och invändning (§21). Hålla integritetspolicyn aktuell.
-- **Master Data Management:** Äga Supabase-schemats `users`-tabell och `consent_log`-tabell. Säkerställa datakvalitet, konsistens och att inga orphaned records uppstår.
-- **Dataprodukt för partners:** Designa aggregerade, anonymiserade dataprodukter som kan säljas. Aldrig sälja råa personuppgifter — alltid aggregerat eller pseudonymiserat med k-anonymitet ≥ 10.
-- **Revisionslogg:** All databehandling som rör delning med tredje part ska loggas i `data_sharing_log`.
+- Samtyckehantering: consent_log i Supabase med granulerade toggles
+- GDPR §17 (radering), §20 (portabilitet), §21 (invändning)
+- Datapunktsdesign för B2B-partnerprodukter
+- k-anonymitet ≥ 10 i alla partnerexporter
 
-### Värdefulla datapunkter att samla (med samtycke)
-Dessa är intressanta för reseföretag, språkskolor och kulturorganisationer:
+### Värdefulla datapunkter (med samtycke)
 
-| Signal | Hur den samlas | Värde för partner |
-|--------|----------------|-------------------|
-| Målspråk + CEFR-nivå | `language_provider`, XP | Destinationsintresse, researrangörer |
-| Lektionstopik (mat, resa, familj…) | `lesson.skillTag` | Reseprofil, livsstilssegment |
-| Engagemangsmönster (daglig/veckovis) | `lesson_started`-events | Köpbenägenhet, aktivitetsnivå |
-| Antal avklarade lektioner + streak | `sagaProvider` | Seriöshetsgrad, konverteringspotential |
-| Inbyggt språk (`nativeLanguage`) | `users.native_language` | Hemland/marknad |
-| Platform (iOS/Android/Web) | `EventSensor.platform` | Kampanjkanal |
-| Klockslag för aktivitet | `emittedAt` i events | Primetime per segment |
+| Signal | Källa | B2B-värde |
+|---|---|---|
+| Målspråk + CEFR | language_provider, XP | Reseintresse, kurser |
+| Lektionstopik | lesson.skillTag | Livsstilsprofil |
+| Engagemangsmönster | lesson_started-events | Köpbenägenhet |
+| Klockslag för aktivitet | EventSensor.emittedAt | Primetime-segment |
+| Platform | EventSensor.platform | Kampanjkanal |
 
-### Supabase-schema som DataSteve äger
+### GDPR-checklista (körs vid release)
+- [ ] Samtycke loggat i `consent_log` innan data delas
+- [ ] Rätt till radering: CASCADE på users-tabellen
+- [ ] Rätt till portabilitet: `/api/export?uid=`
+- [ ] Integritetspolicyn versionshanterad i `consent_log.version`
+- [ ] Inga råa personuppgifter i partnerexporter
 
-```sql
--- Samtycke per användare och ändamål
-CREATE TABLE public.consent_log (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  purpose     TEXT NOT NULL,  -- 'analytics_sale', 'partner_profile', etc.
-  granted     BOOLEAN NOT NULL,
-  granted_at  TIMESTAMPTZ DEFAULT NOW(),
-  ip_hash     TEXT,           -- anonymiserad, för audit
-  version     TEXT NOT NULL   -- integritetspolicy-version vid samtycke
-);
-ALTER TABLE public.consent_log ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "own_consent" ON public.consent_log
-  USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+### Output-format
+Se JSON-schema under **Kommunikationsprotokoll** → `"agent": "datasteve"`.
 
--- Logg över faktisk datadelning med tredje part
-CREATE TABLE public.data_sharing_log (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  partner_name TEXT NOT NULL,
-  data_type    TEXT NOT NULL,   -- 'aggregated_segment', 'anonymized_profile'
-  record_count INT  NOT NULL,
-  exported_at  TIMESTAMPTZ DEFAULT NOW(),
-  legal_basis  TEXT NOT NULL    -- 'consent', 'legitimate_interest'
-);
+---
+
+## Subagent 5: Visionary 🔭
+
+**Modell:** `claude-sonnet-4-5`
+**Roll:** Marknadsanalys, GAP-analys mot konkurrenter, feature-specs.
+
+### Arbetsflöde
+1. Läs COMPETITORS.md (via Explorer)
+2. Identifiera gap: vad saknar konkurrenter?
+3. Formulera feature-spec med tydlig differentiering
+4. Skicka spec till Orkestratorn → Builder + QA
+
+### Output-format
+Se JSON-schema under **Kommunikationsprotokoll** → `"agent": "visionary"`.
+
+---
+
+## Fullständigt orkestreringsflöde
+
 ```
-
-### Consent-flöde (UI-krav)
-Vid onboarding, innan appen börjar samla analysdata, ska användaren se:
-
-1. **Tydlig rubrik:** "Hur vi håller Axiom gratis"
-2. **Klarspråk:** "Vi delar din läroprofil (språkmål, ämnen du studerar, engagemangsmönster) med utvalda partners som reseföretag. Vi säljer aldrig ditt namn, e-post eller exakta plats."
-3. **Granulerade val:** Minst två separata toggle-switches — en för "anonymiserad statistik" (on by default) och en för "personaliserad profil till partners" (off by default, opt-in).
-4. **Länk till fullständig integritetspolicy**
-5. **"Ändra när som helst"** — synlig i Inställningar
-
-### GDPR-checklista (körs vid varje release)
-- [ ] Samtycke inhämtat och loggat i `consent_log` innan data delas
-- [ ] Återkallelse av samtycke raderar användarens data från `data_sharing_log` (framtida delning stoppas)
-- [ ] Rätt till radering: `DELETE FROM users WHERE id = $uid` triggar cascade på alla tabeller
-- [ ] Rätt till dataportabilitet: `/api/export?uid=` exporterar all data som JSON
-- [ ] Integritetspolicyn versionshanteras — version lagras i `consent_log.version`
-- [ ] Inga råa personuppgifter (namn, e-post, exakt ålder) i partnerexporter
-- [ ] k-anonymitet ≥ 10 i alla aggregerade dataexporter
-
-### DataSteve-format
-```
-DATASTEVE REPORT 📊
-Uppgift: [vad som granskats/designats]
-Samtyckesstatus: [COMPLIANT ✅ / ÅTGÄRD KRÄVS ⚠️]
-GDPR-risk: [ingen / låg / medel / hög]
-Datapunkter berörda: [lista]
-Rekommendation: [konkret nästa steg]
+Användare: "Lägg till spaced repetition för svaga ordpar"
+                        │
+                        ▼
+              ORKESTRATORN (Opus)
+              Analyserar: behöver Explorer + Visionary + Builder + QA
+                        │
+           ┌────────────┼────────────┐
+           ▼            ▼            ▼
+        Explorer     Visionary    DataSteve
+     (hittar         (GAP-analys  (GDPR-check:
+      befintlig        SR-konkur-   ny datapunkt
+      SagaProvider)    renter)      "retries")
+           │            │            │
+           └────────────┴────────────┘
+                        │
+                        ▼
+              ORKESTRATORN syntetiserar
+              → skriver spec till Builder
+                        │
+                        ▼
+                    Builder (Haiku)
+                  implementerar i
+                  saga_provider.dart
+                        │
+                        ▼
+                   QA Guardian
+                  granskar diff
+                        │
+                   QA APPROVED ✅
+                        │
+                        ▼
+              ORKESTRATORN levererar
+              sammanfattning + diff
 ```
 
 ---
 
-## Samarbetsprotokoll
+## Kommunikationsprotokoll (obrytbart)
 
-```
-VISIONARY
-    ↓
-Analyserar COMPETITORS.md + GAP-analys
-Skapar feature-spec
-    ↓
-        ↙               ↘
-  UI/Feature Builder    QA Guardian
-  (bygger featuren)     (granskar spec + implementation)
-        ↘               ↙
-         QA APPROVED ✅
-              ↓
-     Feature klar – Visionary dokumenterar leveransen
+**Alla subagenter kommunicerar ENDAST via JSON** när de rapporterar till Orkestratorn.
+Fritext är förbjudet i subagent-output — det ökar tokens utan värde.
+**Enda undantaget:** Orkestratorn använder fritext när den sammanfattar och konverserar med användaren.
 
-DATASTEVE granskar parallellt alla features som rör datainsamling,
-samtycke eller användarprofilering. Blockerar release vid GDPR-risk.
+### JSON-scheman per subagent
+
+**Explorer:**
+```json
+{
+  "agent": "explorer",
+  "files": [
+    { "path": "lib/...", "lines": "10-40", "findings": ["finding 1", "finding 2"] }
+  ]
+}
 ```
 
-### Aktiveringskommandon
-| Kommando | Effekt |
-|---|---|
-| `QA: <uppgift>` | Aktiverar QA Guardian |
-| `UI: <uppgift>` | Aktiverar UI/Feature Builder |
-| `VISIONARY: <uppgift>` | Aktiverar Visionary för GAP-analys och feature-förslag |
-| `DATASTEVE: <uppgift>` | Aktiverar DataSteve för datapunktsdesign, GDPR och MDM |
-| `BOTH: <uppgift>` | Kör QA + UI samarbetsloopen |
-| `ALL: <uppgift>` | Kör hela kedjan: Visionary → UI → QA → DataSteve |
+**Builder:**
+```json
+{
+  "agent": "builder",
+  "status": "done | blocked",
+  "files": [
+    { "path": "lib/...", "action": "created | modified", "summary": "kort beskrivning" }
+  ],
+  "blockers": ["beskrivning om status är blocked"]
+}
+```
+
+**QA Guardian:**
+```json
+{
+  "agent": "qa",
+  "status": "approved | blocked",
+  "issues": [
+    { "severity": "critical | warn", "file": "lib/...", "line": 42, "detail": "beskrivning" }
+  ],
+  "recommendations": ["icke-blockerande förbättring"]
+}
+```
+
+**DataSteve:**
+```json
+{
+  "agent": "datasteve",
+  "consent_status": "compliant | action_required",
+  "gdpr_risk": "none | low | medium | high",
+  "findings": ["finding 1"],
+  "recommendation": "konkret nästa steg"
+}
+```
+
+**Visionary:**
+```json
+{
+  "agent": "visionary",
+  "feature": "namn",
+  "market_gap": "vad konkurrenter saknar",
+  "axiom_advantage": "hur vi gör det bättre",
+  "impact": "high | medium | low",
+  "impact_reason": "motivering",
+  "spec": "detaljerad spec till Builder"
+}
+```
 
 ---
 
-## Regler
-1. Ingen feature mergas utan `QA APPROVED`
-2. Agenter granskar aldrig sitt eget arbete
-3. QA blockerar alltid vid säkerhetsproblem – oavsett hur liten risken verkar
-4. UI-agenten ska alltid bifoga animationsval och fontstrategi i sin rapport
-5. Visionary ska alltid referera till COMPETITORS.md och motivera varför featuren ger konkurrensfördel
-6. Uppdatera COMPETITORS.md när ny konkurrentinfo tillkommer
-7. **DataSteve granskar alltid features som rör datainsamling eller användarprofilering innan release**
-8. **Ingen data delas med tredje part utan loggat samtycke i `consent_log`**
+## Regler (obrytbara)
+
+1. **Alla uppgifter via Orkestratorn** — inga direktanrop till subagenter
+2. **QA alltid efter Builder** — ingen kod mergas utan `"status": "approved"`
+3. **Agenter granskar aldrig sitt eget arbete**
+4. **DataSteve blockerar** release vid GDPR-risk — oavsett allt annat
+5. **Explorer läser aldrig hela filer** — alltid radintervall
+6. **Builder improviserar aldrig** — spec måste vara komplett innan start
+7. **Ingen PII** i events, loggar eller partnerexporter
+8. **Subagenter svarar ALLTID i JSON** — aldrig fritext i agent-till-agent-kommunikation
+
+---
+
+## Aktivering
+
+Skriv bara din uppgift normalt — Orkestratorn tar hand om resten.
+
+För att styra explicit:
+```
+ORCHESTRATE: <uppgift>          → Kör hela kedjan
+QUICK: <uppgift>                → Haiku direkt, ingen orkestrering (enkel fix)
+DATASTEVE: <uppgift>            → GDPR/data direkt
+VISIONARY: <uppgift>            → Marknadsanalys direkt
+```

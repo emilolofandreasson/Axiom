@@ -18,7 +18,9 @@ import json
 import uuid
 import time
 import sys
-import requests  # only stdlib + requests needed — no extra deps
+import threading
+import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ---------------------------------------------------------------------------
 # Validate required env vars before doing anything else
@@ -38,17 +40,18 @@ if missing:
 SUPABASE_URL      = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY      = os.environ["SUPABASE_SERVICE_KEY"]
 GEMINI_API_KEY    = os.environ["GEMINI_SEED_API_KEY"]
-GEMINI_MODEL      = "gemini-2.0-flash-lite"   # 30 RPM free tier vs 15 for flash
+GEMINI_MODEL      = "gemini-2.0-flash-lite"   # 30 RPM free tier
 GEMINI_ENDPOINT   = (
     f"https://generativelanguage.googleapis.com/v1beta/models/"
     f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 )
 
-MIN_QUESTIONS     = 50    # target floor per (language, cefr_level)
-BATCH_SIZE        = 10    # questions generated per Gemini call
-MAX_BATCHES       = 10    # max Gemini calls per run
-RETRY_DELAY_S     = 15    # seconds between retries on rate-limit
-INTER_CALL_DELAY  = 8     # seconds between successful calls (~7 RPM, well under 30)
+MIN_QUESTIONS        = 50    # target floor per (language, cefr_level)
+BATCH_SIZE           = 10    # questions generated per Gemini call
+MAX_BATCHES_PER_PAIR = 10    # max Gemini calls per (lang, cefr) pair
+MAX_WORKERS          = 4     # parallel threads — 4 × ~7 RPM ≈ 28 RPM (under 30 limit)
+INTER_CALL_DELAY     = 2.1   # seconds enforced by rate limiter between any two calls
+RETRY_DELAY_S        = 10    # base wait on 429 (exponential: 10, 20, 30)
 
 # Languages and CEFR levels to maintain
 TARGETS = [
@@ -75,7 +78,6 @@ LANGUAGE_NAMES = {
     "he": "Hebrew",         "vi": "Vietnamese",
 }
 
-# Skill tags rotated per CEFR level to ensure diverse vocabulary
 SKILL_TAGS_BY_CEFR = {
     "A1": [
         "vocabulary/greetings", "vocabulary/numbers", "vocabulary/colors",
@@ -100,6 +102,34 @@ SKILL_TAGS_BY_CEFR = {
 }
 
 # ---------------------------------------------------------------------------
+# Global rate limiter — shared across all threads to stay under 30 RPM
+# ---------------------------------------------------------------------------
+
+_rate_lock   = threading.Lock()
+_last_call_ts = 0.0
+
+def _acquire_rate_slot():
+    """Blocks the calling thread until a Gemini call slot is available."""
+    global _last_call_ts
+    with _rate_lock:
+        elapsed = time.monotonic() - _last_call_ts
+        wait    = INTER_CALL_DELAY - elapsed
+        if wait > 0:
+            time.sleep(wait)
+        _last_call_ts = time.monotonic()
+
+# Thread-safe counters
+_stats_lock    = threading.Lock()
+_total_inserted = 0
+_total_calls    = 0
+
+def _add_stats(inserted: int, calls: int):
+    global _total_inserted, _total_calls
+    with _stats_lock:
+        _total_inserted += inserted
+        _total_calls    += calls
+
+# ---------------------------------------------------------------------------
 # Supabase helpers
 # ---------------------------------------------------------------------------
 
@@ -120,7 +150,7 @@ def get_counts():
         print("  Hint: SUPABASE_SERVICE_KEY must be the service_role key, not the anon key.")
         resp.raise_for_status()
     rows = resp.json()
-    print(f"  Supabase: fetched {len(rows)} total question records")
+    print(f"Supabase: fetched {len(rows)} total question records")
     counts = {}
     for row in rows:
         key = (row["language"], row["cefr_level"])
@@ -129,7 +159,6 @@ def get_counts():
 
 
 def insert_questions(rows: list[dict]) -> int:
-    """Inserts rows into global_questions. Returns number inserted."""
     if not rows:
         return 0
     url = f"{SUPABASE_URL}/rest/v1/global_questions"
@@ -181,6 +210,7 @@ def call_gemini(prompt: str, retries: int = 3) -> list[dict] | None:
         "generationConfig": {"temperature": 0.8, "maxOutputTokens": 2048},
     }
     for attempt in range(retries):
+        _acquire_rate_slot()
         try:
             resp = requests.post(GEMINI_ENDPOINT, json=body, timeout=60)
             if resp.status_code == 429:
@@ -190,11 +220,9 @@ def call_gemini(prompt: str, retries: int = 3) -> list[dict] | None:
                 continue
             if not resp.ok:
                 print(f"  Gemini error {resp.status_code}: {resp.text[:300]}")
-                print(f"  Model used: {GEMINI_MODEL}")
-                print("  Hint: Ensure GEMINI_SEED_API_KEY is valid and has access to this model.")
                 break
             resp.raise_for_status()
-            text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+            text  = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
             clean = text.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
             return json.loads(clean)
         except Exception as e:
@@ -210,7 +238,6 @@ def call_gemini(prompt: str, retries: int = 3) -> list[dict] | None:
 
 def parse_questions(items: list[dict], language: str, cefr: str,
                     skill_tag: str) -> list[dict]:
-    """Converts Gemini JSON items to global_questions rows."""
     rows = []
     for item in items:
         q_type = item.get("type")
@@ -230,13 +257,11 @@ def parse_questions(items: list[dict], language: str, cefr: str,
                 "correct_index": correct,
                 "hint":          item.get("hint"),
             }
-
-        else:  # word_order
+        else:
             words = item.get("shuffled_words", [])
             order = item.get("correct_order", [])
             if not words or not order:
                 continue
-            # Normalise order to ints
             if order and isinstance(order[0], str):
                 order = [words.index(w) if w in words else 0 for w in order]
             order = [int(i) for i in order if 0 <= int(i) < len(words)]
@@ -266,63 +291,85 @@ def parse_questions(items: list[dict], language: str, cefr: str,
 
 
 # ---------------------------------------------------------------------------
+# Per-pair worker (runs in thread pool)
+# ---------------------------------------------------------------------------
+
+def process_pair(lang: str, cefr: str, current: int) -> dict:
+    """Generates and inserts questions for one (lang, cefr) pair. Thread-safe."""
+    needed    = MIN_QUESTIONS - current
+    label     = f"[{lang.upper()} {cefr}]"
+
+    if needed <= 0:
+        return {"lang": lang, "cefr": cefr, "inserted": 0, "calls": 0, "skipped": True}
+
+    skill_tags = SKILL_TAGS_BY_CEFR.get(cefr, ["vocabulary/general"])
+    lang_name  = LANGUAGE_NAMES.get(lang, lang)
+    generated  = 0
+    calls      = 0
+
+    while generated < needed and calls < MAX_BATCHES_PER_PAIR:
+        skill       = skill_tags[(calls) % len(skill_tags)]
+        batch_count = min(BATCH_SIZE, needed - generated)
+
+        print(f"  {label} generating {batch_count} [{skill}] (call {calls + 1})")
+        prompt = build_prompt(lang_name, lang, cefr, skill, batch_count)
+        items  = call_gemini(prompt)
+        calls += 1
+
+        if not items:
+            print(f"  {label} no response, stopping.")
+            break
+
+        rows = parse_questions(items, lang, cefr, skill)
+        if rows:
+            inserted   = insert_questions(rows)
+            generated += inserted
+            print(f"  {label} +{inserted} (total {current + generated}/{MIN_QUESTIONS})")
+        else:
+            print(f"  {label} no valid questions parsed.")
+
+    _add_stats(generated, calls)
+    return {"lang": lang, "cefr": cefr, "inserted": generated, "calls": calls, "skipped": False}
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main():
     print("=== Axiom Question Bank Seeder ===")
-    print(f"Target: {MIN_QUESTIONS} questions per (language, cefr_level)\n")
+    print(f"Target: {MIN_QUESTIONS} per (language, cefr_level) | workers: {MAX_WORKERS} | RPM limit: ~{int(60 / INTER_CALL_DELAY * MAX_WORKERS)}\n")
 
-    counts   = get_counts()
-    batches_used = 0
-    total_inserted = 0
+    counts = get_counts()
 
-    for lang, cefr in TARGETS:
-        current = counts.get((lang, cefr), 0)
-        needed  = MIN_QUESTIONS - current
-        print(f"[{lang.upper()} {cefr}] {current}/{MIN_QUESTIONS} questions", end="")
+    pairs_to_fill = [
+        (lang, cefr, counts.get((lang, cefr), 0))
+        for lang, cefr in TARGETS
+        if counts.get((lang, cefr), 0) < MIN_QUESTIONS
+    ]
 
-        if needed <= 0:
-            print(" — OK, skipping")
-            continue
+    skipped = len(TARGETS) - len(pairs_to_fill)
+    print(f"Pairs at target: {skipped}/{len(TARGETS)} — filling {len(pairs_to_fill)} pairs\n")
 
-        print(f" — needs {needed} more")
+    if not pairs_to_fill:
+        print("All pairs above threshold — nothing to do.")
+        return
 
-        skill_tags = SKILL_TAGS_BY_CEFR.get(cefr, ["vocabulary/general"])
-        lang_name  = LANGUAGE_NAMES.get(lang, lang)
-        generated  = 0
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {
+            executor.submit(process_pair, lang, cefr, current): (lang, cefr)
+            for lang, cefr, current in pairs_to_fill
+        }
+        for future in as_completed(futures):
+            try:
+                result = future.result()
+                if not result["skipped"] and result["inserted"] == 0:
+                    print(f"  [{result['lang'].upper()} {result['cefr']}] WARNING: 0 inserted after {result['calls']} calls")
+            except Exception as e:
+                lang, cefr = futures[future]
+                print(f"  [{lang.upper()} {cefr}] ERROR: {e}")
 
-        while generated < needed and batches_used < MAX_BATCHES:
-            skill = skill_tags[generated % len(skill_tags)]
-            batch_count = min(BATCH_SIZE, needed - generated)
-
-            print(f"  Generating {batch_count} questions [{skill}]...")
-            prompt = build_prompt(lang_name, lang, cefr, skill, batch_count)
-            items  = call_gemini(prompt)
-
-            if not items:
-                print("  Failed to get response, skipping batch.")
-                break
-
-            rows = parse_questions(items, lang, cefr, skill)
-            if rows:
-                inserted = insert_questions(rows)
-                generated    += inserted
-                total_inserted += inserted
-                print(f"  Inserted {inserted} questions (total for pair: {current + generated})")
-            else:
-                print("  No valid questions parsed from response.")
-
-            batches_used += 1
-            if batches_used >= MAX_BATCHES:
-                print(f"\nReached MAX_BATCHES ({MAX_BATCHES}), stopping early.")
-                break
-
-            time.sleep(INTER_CALL_DELAY)  # polite pacing between calls
-
-    print(f"\nDone. Total inserted: {total_inserted}. Gemini calls: {batches_used}.")
-    if total_inserted == 0 and batches_used == 0:
-        print("All language/CEFR pairs already above threshold — nothing to do.")
+    print(f"\nDone. Inserted: {_total_inserted} questions across {_total_calls} Gemini calls.")
 
 
 if __name__ == "__main__":
